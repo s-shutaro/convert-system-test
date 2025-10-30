@@ -424,7 +424,7 @@ function ExcelPreviewRenderer({ variables, data }: { variables: any; data: any }
     );
   };
 
-  const renderSection = (schema: any, currentData: any, basePath: string = ''): JSX.Element => {
+  const renderSection = (schema: any, currentData: any, basePath: string = ''): React.ReactElement => {
     // 配列の場合
     if (Array.isArray(schema)) {
       const arrayData = currentData || [];
