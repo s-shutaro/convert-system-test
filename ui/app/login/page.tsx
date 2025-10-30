@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { login } from '@/lib/auth';
+import { useAuth } from '@/contexts/auth-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,6 +14,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const { refreshUser } = useAuth();
 
   // Debug: Check environment variables
   console.log('Cognito Config:', {
@@ -31,7 +33,11 @@ export default function LoginPage() {
 
       if (result.isSignedIn) {
         toast.success('ログインに成功しました');
+        // Refresh user state in AuthContext
+        await refreshUser();
+        // Navigate to home page
         router.push('/');
+        router.refresh();
       } else {
         toast.error('ログインに失敗しました。もう一度お試しください。');
       }
