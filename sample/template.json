@@ -1,0 +1,43 @@
+{
+    "basic_info": {
+        "furigana": "",
+        "age": "",
+        "gender": "",
+        "name": "",
+        "experience_years": "",
+        "nearest_station": ""
+    },
+    "qualifications": "",
+    "skills": {
+        "machines": "",
+        "languages_or_tools": ""
+    },
+    "self_pr": "",
+    "work_experience": [
+        {
+            "index": "",
+            "period": {
+                "start": "",
+                "end": "",
+                "duration": ""
+            },
+            "project": {
+                "overview": ""
+            },
+            "role": "",
+            "team_size": "",
+            "phases": {
+                "コンサル": "",
+                "要件定義": "",
+                "基本設計": "",
+                "詳細設計": "",
+                "製造": "",
+                "構築": "",
+                "テスト": "",
+                "運用保守": "",
+                "サポート": ""
+            },
+            "environment_or_languages": ""
+        }
+    ]
+}
