@@ -14,17 +14,44 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
+  // Debug: Check environment variables
+  console.log('Cognito Config:', {
+    region: process.env.NEXT_PUBLIC_AWS_REGION,
+    userPoolId: process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID,
+    clientId: process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID,
+  });
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
 
     try {
-      await login(email, password);
-      toast.success('ログインに成功しました');
-      router.push('/');
+      const result = await login(email, password);
+      console.log('Login result:', result);
+
+      if (result.isSignedIn) {
+        toast.success('ログインに成功しました');
+        router.push('/');
+      } else {
+        toast.error('ログインに失敗しました。もう一度お試しください。');
+      }
     } catch (error: any) {
       console.error('Login error:', error);
-      toast.error(error.message || 'ログインに失敗しました');
+
+      // より詳細なエラーメッセージを表示
+      let errorMessage = 'ログインに失敗しました';
+
+      if (error.name === 'UserNotFoundException') {
+        errorMessage = 'ユーザーが見つかりません';
+      } else if (error.name === 'NotAuthorizedException') {
+        errorMessage = 'メールアドレスまたはパスワードが正しくありません';
+      } else if (error.name === 'UserNotConfirmedException') {
+        errorMessage = 'ユーザーが確認されていません';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
