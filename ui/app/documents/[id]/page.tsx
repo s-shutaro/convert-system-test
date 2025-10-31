@@ -212,7 +212,7 @@ export default function DocumentDetailPage() {
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Left Column: PDF Preview & Extract */}
         <div className="space-y-6">
-          {/*pdfUrl && <PDFPreview url={pdfUrl} filename={document.filename} />*/}
+          pdfUrl && <PDFPreview url={pdfUrl} filename={document.filename} />
 
           {/* 構造抽出フォームは常に表示（複数テンプレートで抽出可能） */}
           <ExtractForm
