@@ -61,7 +61,7 @@ export function PDFPreview({ url, filename }: PDFPreviewProps) {
       </CardHeader>
       <CardContent>
         <div className="flex flex-col items-center space-y-4">
-          <div className="border rounded-lg overflow-auto max-h-[600px] w-full bg-gray-50 flex justify-center items-start">
+          <div className="border rounded-lg overflow-auto max-h-[600px] w-full bg-gray-50">
             <PDFDocument
               file={url}
               onLoadSuccess={onDocumentLoadSuccess}
