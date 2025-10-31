@@ -35,15 +35,39 @@ export default function DocumentDetailPage() {
   const getStructuredData = useAppStore((state) => state.getStructuredData);
 
   useEffect(() => {
-    loadDocument();
-    loadTemplates();
+    const loadData = async () => {
+      try {
+        setLoading(true);
+
+        // 並行実行して両方の完了を待つ
+        const [doc, templatesResponse] = await Promise.all([
+          apiClient.getDocument(documentId),
+          apiClient.listTemplates(50)
+        ]);
+
+        setDocument(doc);
+        setTemplates(templatesResponse.items);
+
+        // その後、順次処理
+        const urlResponse = await apiClient.getDownloadUrl(documentId, 'original');
+        setPdfUrl(urlResponse.download_url);
+
+        await loadStructuresList();
+      } catch (error: any) {
+        toast.error(error.response?.data?.detail || 'データの取得に失敗しました');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
   }, [documentId]);
 
   useEffect(() => {
-    if (selectedTemplateId) {
+    if (selectedTemplateId && templates.length > 0) {
       loadStructureForTemplate(selectedTemplateId);
     }
-  }, [selectedTemplateId]);
+  }, [selectedTemplateId, templates.length]);
 
   const loadDocument = async () => {
     try {
@@ -53,22 +77,8 @@ export default function DocumentDetailPage() {
       // Get PDF download URL
       const urlResponse = await apiClient.getDownloadUrl(documentId, 'original');
       setPdfUrl(urlResponse.download_url);
-
-      // Load structured data list
-      await loadStructuresList();
     } catch (error: any) {
       toast.error(error.response?.data?.detail || 'ドキュメントの取得に失敗しました');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadTemplates = async () => {
-    try {
-      const response = await apiClient.listTemplates(50);
-      setTemplates(response.items);
-    } catch (error: any) {
-      console.error('Failed to load templates', error);
     }
   };
 
@@ -249,21 +259,37 @@ export default function DocumentDetailPage() {
               {/* 動的構造化データエディター: テンプレート変数に基づいてUIを生成 */}
               {(() => {
                 const template = templates.find(t => t.template_id === selectedTemplateId);
-                return template ? (
+
+                if (!template) {
+                  // templatesがまだ読み込まれていない可能性
+                  if (templates.length === 0) {
+                    return (
+                      <div className="flex justify-center items-center min-h-[200px]">
+                        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                        <span className="ml-2 text-sm text-muted-foreground">
+                          テンプレート情報を読み込んでいます...
+                        </span>
+                      </div>
+                    );
+                  }
+                  // テンプレートが見つからない場合はフォールバック
+                  return (
+                    <StructureEditor
+                      documentId={documentId}
+                      templateId={selectedTemplateId}
+                      initialData={currentStructure.structured_data}
+                      onSave={handleStructureSave}
+                    />
+                  );
+                }
+
+                return (
                   <DynamicStructureEditor
                     documentId={documentId}
                     templateId={selectedTemplateId}
                     template={template}
                     initialData={currentStructure.structured_data}
                     pdfUrl={pdfUrl}
-                    onSave={handleStructureSave}
-                  />
-                ) : (
-                  // フォールバック: 旧エディター（テンプレート情報が取得できない場合）
-                  <StructureEditor
-                    documentId={documentId}
-                    templateId={selectedTemplateId}
-                    initialData={currentStructure.structured_data}
                     onSave={handleStructureSave}
                   />
                 );
