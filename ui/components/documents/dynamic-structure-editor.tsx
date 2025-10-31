@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { FieldRenderer } from '@/components/dynamic-form/field-renderer';
 import { ArrayFieldRenderer } from '@/components/dynamic-form/array-field-renderer';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { PDFPreview } from './pdf-preview';
 
 interface Template {
   template_id: string;
@@ -279,12 +280,8 @@ export function DynamicStructureEditor({
                     オリジナルPDF
                   </h3>
                   {pdfUrl ? (
-                    <div className="border-2 border-gray-300 rounded-lg overflow-hidden bg-white shadow-inner">
-                      <iframe
-                        src={pdfUrl}
-                        className="w-full h-[calc(95vh-180px)]"
-                        title="PDF Preview"
-                      />
+                    <div className="h-[calc(95vh-180px)] overflow-auto">
+                      <PDFPreview url={pdfUrl} filename="Document" />
                     </div>
                   ) : (
                     <div className="flex items-center justify-center h-96 bg-gray-100 rounded-lg">
