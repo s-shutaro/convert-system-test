@@ -238,7 +238,7 @@ class ApiClient {
     return data;
   }
 
-  async pollJob(jobId: string, timeout: number = 30): Promise<Job> {
+  async pollJob(jobId: string, timeout: number = 25): Promise<Job> {
     const { data } = await this.client.get<Job>(`/jobs/${jobId}/poll`, {
       params: { timeout },
       timeout: (timeout + 5) * 1000, // Add 5 seconds buffer
