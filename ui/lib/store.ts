@@ -41,6 +41,8 @@ interface AppState {
   setJob: (jobId: string, job: Job) => void;
   removeJob: (jobId: string) => void;
   getJob: (jobId: string) => Job | undefined;
+  getActiveJobForTemplate: (documentId: string, templateId: string) => Job | undefined;
+  getAllActiveJobs: () => Job[];
 
   // Actions - UI
   setIsLoading: (isLoading: boolean) => void;
@@ -139,6 +141,22 @@ export const useAppStore = create<AppState>((set, get) => ({
     }),
 
   getJob: (jobId) => get().activeJobs.get(jobId),
+
+  getActiveJobForTemplate: (documentId, templateId) => {
+    const jobs = Array.from(get().activeJobs.values());
+    return jobs.find(
+      (job) =>
+        job.document_id === documentId &&
+        job.template_id === templateId &&
+        (job.status === 'queued' || job.status === 'running')
+    );
+  },
+
+  getAllActiveJobs: () => {
+    return Array.from(get().activeJobs.values()).filter(
+      (job) => job.status === 'queued' || job.status === 'running'
+    );
+  },
 
   // UI actions
   setIsLoading: (isLoading) => set({ isLoading }),

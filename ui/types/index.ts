@@ -49,6 +49,8 @@ export interface Job {
   output?: any;
   error?: string;
   updated_at: number;
+  document_id?: string; // Added for tracking which document this job belongs to
+  template_id?: string; // Added for tracking which template this job uses
 }
 
 // API Response types

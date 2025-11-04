@@ -66,7 +66,7 @@ export function DynamicStructureEditor({
     if (initialData) {
       setData(initialData);
     }
-  }, [initialData]);
+  }, [initialData, templateId, documentId]);
 
   // データが空でvariablesがある場合、初期値を生成
   useEffect(() => {

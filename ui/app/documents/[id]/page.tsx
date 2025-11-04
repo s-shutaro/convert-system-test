@@ -15,8 +15,9 @@ import { ConvertForm } from '@/components/documents/convert-form';
 import { apiClient } from '@/lib/api-client';
 import { useAppStore } from '@/lib/store';
 import { toast } from 'sonner';
-import { getStatusColor, getStatusLabel } from '@/lib/utils';
+import { getStatusColor, getStatusLabel, formatRelativeTime } from '@/lib/utils';
 import type { Document, StructuredDataListItem, Template } from '@/types';
+import { JobProgressCard } from '@/components/documents/job-progress-card';
 
 export default function DocumentDetailPage() {
   const params = useParams();
@@ -33,6 +34,7 @@ export default function DocumentDetailPage() {
 
   const setStructuredData = useAppStore((state) => state.setStructuredData);
   const getStructuredData = useAppStore((state) => state.getStructuredData);
+  const getActiveJobForTemplate = useAppStore((state) => state.getActiveJobForTemplate);
 
   useEffect(() => {
     const loadData = async () => {
@@ -64,10 +66,10 @@ export default function DocumentDetailPage() {
   }, [documentId]);
 
   useEffect(() => {
-    if (selectedTemplateId && templates.length > 0) {
+    if (selectedTemplateId) {
       loadStructureForTemplate(selectedTemplateId);
     }
-  }, [selectedTemplateId, templates.length]);
+  }, [selectedTemplateId]);
 
   const loadDocument = async () => {
     try {
@@ -199,13 +201,23 @@ export default function DocumentDetailPage() {
             <h1 className="text-3xl font-bold">{document.filename}</h1>
             {/* ドキュメント自体にステータスはないため、構造化データのステータスを表示 */}
             {structures.length > 0 && (
-              <div className="flex items-center gap-2 mt-2">
+              <div className="flex flex-wrap items-center gap-2 mt-2">
                 {structures.map((structure) => {
                   const template = templates.find(t => t.template_id === structure.template_id);
+                  const activeJob = getActiveJobForTemplate(documentId, structure.template_id);
+                  const isProcessing = activeJob && (activeJob.status === 'queued' || activeJob.status === 'running');
+
                   return (
-                    <Badge key={structure.template_id} className={getStatusColor(structure.status)}>
-                      {template?.name || structure.template_id}: {getStatusLabel(structure.status)}
-                    </Badge>
+                    <div key={structure.template_id} className="flex items-center gap-1">
+                      <Badge className={getStatusColor(isProcessing ? activeJob.status : structure.status)}>
+                        {template?.name || structure.template_id}: {getStatusLabel(isProcessing ? activeJob.status : structure.status)}
+                      </Badge>
+                      {structure.status === 'completed' && !isProcessing && (
+                        <span className="text-xs text-muted-foreground">
+                          ({formatRelativeTime(structure.updated_at)})
+                        </span>
+                      )}
+                    </div>
                   );
                 })}
               </div>
@@ -222,7 +234,7 @@ export default function DocumentDetailPage() {
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Left Column: PDF Preview & Extract */}
         <div className="space-y-6">
-          pdfUrl && <PDFPreview url={pdfUrl} filename={document.filename} />
+          {pdfUrl && <PDFPreview url={pdfUrl} filename={document.filename} />}
 
           {/* 構造抽出フォームは常に表示（複数テンプレートで抽出可能） */}
           <ExtractForm
@@ -254,54 +266,101 @@ export default function DocumentDetailPage() {
             </div>
           )}
 
-          {currentStructure && currentStructure.status === 'completed' && (
-            <>
-              {/* 動的構造化データエディター: テンプレート変数に基づいてUIを生成 */}
-              {(() => {
-                const template = templates.find(t => t.template_id === selectedTemplateId);
+          {/* Processing Job Progress Card */}
+          {selectedTemplateId && (() => {
+            const activeJob = getActiveJobForTemplate(documentId, selectedTemplateId);
+            const template = templates.find(t => t.template_id === selectedTemplateId);
 
-                if (!template) {
-                  // templatesがまだ読み込まれていない可能性
-                  if (templates.length === 0) {
+            if (activeJob && (activeJob.status === 'queued' || activeJob.status === 'running')) {
+              return (
+                <JobProgressCard
+                  job={activeJob}
+                  templateName={template?.name}
+                />
+              );
+            }
+            return null;
+          })()}
+
+          {/* Show structure data or processing message */}
+          {(() => {
+            const activeJob = getActiveJobForTemplate(documentId, selectedTemplateId);
+            const isProcessing = activeJob && (activeJob.status === 'queued' || activeJob.status === 'running');
+
+            // Show processing message if job is active and no completed data yet
+            if (isProcessing && (!currentStructure || currentStructure.status !== 'completed')) {
+              return (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-yellow-500" />
+                  <p className="font-medium">処理中です...</p>
+                  <p className="text-sm mt-2">完了するまでお待ちください</p>
+                </div>
+              );
+            }
+
+            // Show completed data
+            if (currentStructure && currentStructure.status === 'completed') {
+              return (
+                <>
+                  {/* Show info if there's a processing job but we're showing old data */}
+                  {isProcessing && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                      <p className="text-sm text-blue-800">
+                        現在、新しい分析を処理中です。以下は前回の完了済みデータです。
+                      </p>
+                    </div>
+                  )}
+
+                  {/* 動的構造化データエディター: テンプレート変数に基づいてUIを生成 */}
+                  {(() => {
+                    const template = templates.find(t => t.template_id === selectedTemplateId);
+
+                    if (!template) {
+                      // templatesがまだ読み込まれていない可能性
+                      if (templates.length === 0) {
+                        return (
+                          <div className="flex justify-center items-center min-h-[200px]">
+                            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                            <span className="ml-2 text-sm text-muted-foreground">
+                              テンプレート情報を読み込んでいます...
+                            </span>
+                          </div>
+                        );
+                      }
+                      // テンプレートが見つからない場合はフォールバック
+                      return (
+                        <StructureEditor
+                          documentId={documentId}
+                          templateId={selectedTemplateId}
+                          initialData={currentStructure.structured_data}
+                          onSave={handleStructureSave}
+                        />
+                      );
+                    }
+
                     return (
-                      <div className="flex justify-center items-center min-h-[200px]">
-                        <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                        <span className="ml-2 text-sm text-muted-foreground">
-                          テンプレート情報を読み込んでいます...
-                        </span>
-                      </div>
+                      <DynamicStructureEditor
+                        documentId={documentId}
+                        templateId={selectedTemplateId}
+                        template={template}
+                        initialData={currentStructure.structured_data}
+                        pdfUrl={pdfUrl}
+                        onSave={handleStructureSave}
+                      />
                     );
-                  }
-                  // テンプレートが見つからない場合はフォールバック
-                  return (
-                    <StructureEditor
-                      documentId={documentId}
-                      templateId={selectedTemplateId}
-                      initialData={currentStructure.structured_data}
-                      onSave={handleStructureSave}
-                    />
-                  );
-                }
+                  })()}
 
-                return (
-                  <DynamicStructureEditor
+                  <ConvertForm
                     documentId={documentId}
-                    templateId={selectedTemplateId}
-                    template={template}
-                    initialData={currentStructure.structured_data}
-                    pdfUrl={pdfUrl}
-                    onSave={handleStructureSave}
+                    convertedFiles={document.converted_files}
+                    onConvertComplete={loadDocument}
                   />
-                );
-              })()}
+                </>
+              );
+            }
 
-              <ConvertForm
-                documentId={documentId}
-                convertedFiles={document.converted_files}
-                onConvertComplete={loadDocument}
-              />
-            </>
-          )}
+            return null;
+          })()}
 
           {structuresLoaded && structures.length === 0 && (
             <div className="text-center py-12 text-muted-foreground">

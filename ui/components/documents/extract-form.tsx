@@ -74,7 +74,13 @@ export function ExtractForm({ documentId, onExtractStart, onExtractComplete }: E
   const pollJob = async (jobId: string) => {
     try {
       const job = await apiClient.waitForJob(jobId, (currentJob: Job) => {
-        setJob(jobId, currentJob);
+        // Add document_id and template_id to job for tracking
+        const enrichedJob = {
+          ...currentJob,
+          document_id: documentId,
+          template_id: selectedTemplateId,
+        };
+        setJob(jobId, enrichedJob);
         toast.info(`処理中: ${currentJob.step}`);
       });
 
