@@ -12,7 +12,7 @@ import type { Template, Job } from '@/types';
 
 interface ConvertFormProps {
   documentId: string;
-  convertedFiles?: { [template_id: string]: string }; // template_id -> S3 file key
+  convertedFiles?: { [template_id: string]: string } | string[]; // template_id -> S3 file key or array
   onConvertComplete?: () => void;
 }
 
@@ -21,6 +21,19 @@ export function ConvertForm({ documentId, convertedFiles, onConvertComplete }: C
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [converting, setConverting] = useState(false);
   const [downloading, setDownloading] = useState<string | null>(null);
+
+  // Helper function to extract filename from S3 path
+  const extractFilename = (s3Path: string): string => {
+    const parts = s3Path.split('/');
+    return parts[parts.length - 1] || s3Path;
+  };
+
+  // Helper function to extract template ID from filename
+  const extractTemplateIdFromFilename = (filename: string): string | null => {
+    // Match pattern like "converted_<template-id>.xlsx"
+    const match = filename.match(/converted_([a-f0-9-]+)\./);
+    return match ? match[1] : null;
+  };
 
   useEffect(() => {
     loadTemplates();
@@ -158,7 +171,7 @@ export function ConvertForm({ documentId, convertedFiles, onConvertComplete }: C
         </CardContent>
       </Card>
 
-      {convertedFiles && Object.keys(convertedFiles).length > 0 && (
+      {convertedFiles && (Array.isArray(convertedFiles) ? convertedFiles.length > 0 : Object.keys(convertedFiles).length > 0) && (
         <Card>
           <CardHeader>
             <CardTitle>変換済みファイル</CardTitle>
@@ -167,40 +180,87 @@ export function ConvertForm({ documentId, convertedFiles, onConvertComplete }: C
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
-            {Object.entries(convertedFiles).map(([templateId, fileKeyOrObject]) => {
-              // Handle both string and object formats from API
-              const fileKey = typeof fileKeyOrObject === 'string'
-                ? fileKeyOrObject
-                : (fileKeyOrObject as any)?.file_key;
+            {Array.isArray(convertedFiles) ? (
+              // Handle array format (current backend response)
+              convertedFiles.map((fileKey, index) => {
+                const filename = extractFilename(fileKey);
+                const templateId = extractTemplateIdFromFilename(filename);
+                const template = templateId ? templates.find(t => t.template_id === templateId) : null;
 
-              const template = templates.find(t => t.template_id === templateId);
-              return (
-                <div
-                  key={templateId}
-                  className="flex items-center justify-between p-3 border rounded-lg"
-                >
-                  <div>
-                    <p className="font-medium">{template?.name || templateId}</p>
-                    {fileKey && <p className="text-xs text-muted-foreground">{fileKey}</p>}
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleDownload(templateId)}
-                    disabled={downloading === templateId}
+                return (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between p-3 border rounded-lg"
                   >
-                    {downloading === templateId ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <>
-                        <Download className="h-4 w-4 mr-2" />
-                        ダウンロード
-                      </>
-                    )}
-                  </Button>
-                </div>
-              );
-            })}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{filename}</p>
+                      {template && (
+                        <p className="text-sm text-muted-foreground">
+                          テンプレート: {template.name}
+                        </p>
+                      )}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleDownload(templateId || index.toString())}
+                      disabled={downloading === (templateId || index.toString())}
+                    >
+                      {downloading === (templateId || index.toString()) ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Download className="h-4 w-4 mr-2" />
+                          ダウンロード
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                );
+              })
+            ) : (
+              // Handle object format (expected backend response)
+              Object.entries(convertedFiles).map(([templateId, fileKeyOrObject]) => {
+                // Handle both string and object formats from API
+                const fileKey = typeof fileKeyOrObject === 'string'
+                  ? fileKeyOrObject
+                  : (fileKeyOrObject as any)?.file_key;
+
+                const filename = extractFilename(fileKey);
+                const template = templates.find(t => t.template_id === templateId);
+
+                return (
+                  <div
+                    key={templateId}
+                    className="flex items-center justify-between p-3 border rounded-lg"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{filename}</p>
+                      {template && (
+                        <p className="text-sm text-muted-foreground">
+                          テンプレート: {template.name}
+                        </p>
+                      )}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleDownload(templateId)}
+                      disabled={downloading === templateId}
+                    >
+                      {downloading === templateId ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Download className="h-4 w-4 mr-2" />
+                          ダウンロード
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                );
+              })
+            )}
           </CardContent>
         </Card>
       )}
