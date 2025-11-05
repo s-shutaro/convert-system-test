@@ -1,12 +1,13 @@
-# バックエンド修正推奨事項
+# バックエンド・フロントエンド仕様調整完了報告
 
 ## 概要
-現在、変換済みファイル一覧のAPIレスポンスが配列形式で返されているため、テンプレート情報との紐付けができません。
-フロントエンドでは暫定対応を行いましたが、根本的な解決のためにバックエンドAPIの修正を推奨します。
+変換済みファイル一覧の表示について、バックエンドとフロントエンドの仕様を統一しました。
 
-## 現在の問題点
+バックエンドは既に配列オブジェクト形式で詳細なメタデータを返す実装になっており、フロントエンドをこの形式に対応させました。
 
-### 現在のAPIレスポンス形式
+## ✅ 対応完了: converted_files の形式統一
+
+### バックエンドの実装（意図的な設計）
 ```json
 {
   "document_id": "doc-123",
@@ -14,172 +15,396 @@
   "filename": "skillsheet.pdf",
   "file_key": "documents/...",
   "converted_files": [
-    "documents/public/21578be1-b5a8-4f4a-bead-c96132209c0f/converted_c337042a-1910-43b2-8f33-15e4524fcde1.xlsx",
-    "documents/public/21578be1-b5a8-4f4a-bead-c96132209c0f/converted_a6760477-e348-4a83-9ff3-925e497b1bed.xlsx"
+    {
+      "template_id": "template-456",
+      "template_name": "標準テンプレート",
+      "file_key": "documents/public/21578be1-b5a8-4f4a-bead-c96132209c0f/converted_c337042a.xlsx",
+      "converted_at": 1234567890
+    },
+    {
+      "template_id": "template-789",
+      "template_name": "詳細テンプレート",
+      "file_key": "documents/public/21578be1-b5a8-4f4a-bead-c96132209c0f/converted_a6760477.xlsx",
+      "converted_at": 1234567891
+    }
   ],
   "created_at": 1234567890,
   "updated_at": 1234567890
 }
 ```
 
-### 問題点
-1. **配列形式** のため、どのファイルがどのテンプレートで変換されたか不明
-2. **インデックス番号** (0, 1) がキーになるため、テンプレート情報と紐付けできない
-3. **ファイル名** がS3パス全体のため、ユーザーに分かりづらい
-4. **変換日時** などのメタデータが含まれていない
+### フロントエンドの対応（2025-11-05完了）
 
-## 推奨される修正内容
+#### 1. 型定義の追加
+**ファイル:** `ui/types/index.ts`
 
-### 推奨APIレスポンス形式（オプション1: シンプル）
-```json
-{
-  "document_id": "doc-123",
-  "tenant": "tenant-001",
-  "filename": "skillsheet.pdf",
-  "file_key": "documents/...",
-  "converted_files": {
-    "template-456": "documents/public/21578be1-b5a8-4f4a-bead-c96132209c0f/converted_c337042a-1910-43b2-8f33-15e4524fcde1.xlsx",
-    "template-789": "documents/public/21578be1-b5a8-4f4a-bead-c96132209c0f/converted_a6760477-e348-4a83-9ff3-925e497b1bed.xlsx"
-  },
-  "created_at": 1234567890,
-  "updated_at": 1234567890
+```typescript
+export interface ConvertedFile {
+  template_id: string;
+  template_name: string;
+  file_key: string;
+  converted_at: number;
+}
+
+export interface Document {
+  // ...
+  converted_files?: ConvertedFile[];
+  // ...
 }
 ```
 
-### 推奨APIレスポンス形式（オプション2: 詳細メタデータ付き）
-```json
-{
-  "document_id": "doc-123",
-  "tenant": "tenant-001",
-  "filename": "skillsheet.pdf",
-  "file_key": "documents/...",
-  "converted_files": {
-    "template-456": {
-      "file_key": "documents/public/21578be1-b5a8-4f4a-bead-c96132209c0f/converted_c337042a-1910-43b2-8f33-15e4524fcde1.xlsx",
-      "filename": "skillsheet_converted_standard.xlsx",
-      "template_name": "標準テンプレート",
-      "template_id": "template-456",
-      "converted_at": 1234567890,
-      "file_size": 45678
-    },
-    "template-789": {
-      "file_key": "documents/public/21578be1-b5a8-4f4a-bead-c96132209c0f/converted_a6760477-e348-4a83-9ff3-925e497b1bed.xlsx",
-      "filename": "skillsheet_converted_detailed.xlsx",
-      "template_name": "詳細テンプレート",
-      "template_id": "template-789",
-      "converted_at": 1234567891,
-      "file_size": 67890
-    }
-  },
-  "created_at": 1234567890,
-  "updated_at": 1234567890
-}
-```
+#### 2. コンポーネントの修正
+**ファイル:** `ui/components/documents/convert-form.tsx`
 
-## 修正が必要な箇所
+- 配列オブジェクト形式に対応
+- `template_name` を直接表示（確実に表示可能）
+- S3パスからファイル名を抽出して表示
+- 不要なパターンマッチングロジックを削除
 
-### 1. データ型定義の修正
-**ファイル:** `src/models.py` または該当するモデル定義ファイル
+### メリット
+1. **テンプレート名が確実に表示される** - `template_name` フィールドを直接使用
+2. **信頼性の向上** - ファイル名パターンマッチングが不要
+3. **将来の拡張性** - `converted_at` でソートや日時表示が可能
+4. **シンプルなコード** - 条件分岐が不要で保守しやすい
 
-```python
-# 現在（推測）
-converted_files: List[str] = []
+---
 
-# 修正後（オプション1: シンプル）
-converted_files: Dict[str, str] = {}  # template_id -> file_key
+## 残りの推奨修正事項
 
-# 修正後（オプション2: 詳細）
-converted_files: Dict[str, ConvertedFileInfo] = {}
+以下のAPI仕様の不一致については、引き続き対応が必要です。
 
-class ConvertedFileInfo(BaseModel):
-    file_key: str
-    filename: str
-    template_name: str
-    template_id: str
-    converted_at: int
-    file_size: Optional[int] = None
-```
-
-### 2. 変換処理の修正
-**変換完了時にテンプレートIDをキーとして保存**
-
-```python
-# 現在（推測）
-document.converted_files.append(s3_file_key)
-
-# 修正後（オプション1）
-document.converted_files[template_id] = s3_file_key
-
-# 修正後（オプション2）
-document.converted_files[template_id] = {
-    "file_key": s3_file_key,
-    "filename": generated_filename,
-    "template_name": template.name,
-    "template_id": template_id,
-    "converted_at": int(time.time()),
-    "file_size": file_size
-}
-```
-
-### 3. DynamoDB スキーマの確認
-DynamoDBを使用している場合、`converted_files` の型がMap型になっているか確認してください。
-
-## メリット
-
-### オプション1（シンプル）のメリット
-- 最小限の変更で実装可能
-- テンプレートIDとの紐付けが可能
-- 既存のAPI仕様書に準拠
-
-### オプション2（詳細メタデータ）のメリット
-- ユーザーフレンドリーなファイル名を表示可能
-- テンプレート情報をフロントエンドで再取得する必要がない
-- 変換日時やファイルサイズなどの追加情報を提供可能
-- 将来的な機能拡張に対応しやすい
-
-## 互換性の考慮
-
-### 段階的な移行（推奨）
-1. **Phase 1:** バックエンドで新しい形式をサポート
-2. **Phase 2:** フロントエンドは既に両方の形式に対応済み（今回の修正で実装済み）
-3. **Phase 3:** 古い配列形式のサポートを廃止
-
-### フロントエンドの対応状況
-✅ 配列形式に対応（現在の形式）
-✅ オブジェクト形式に対応（推奨形式）
-✅ 文字列値・オブジェクト値の両方に対応
-
-## API仕様書の更新
+## API仕様書の更新が必要
 
 **ファイル:** `docs/API_SPECIFICATION.md`
 
-既にドキュメントには正しい形式が記載されています（317-319行目）:
+### 修正箇所1: converted_files の形式（317-319行目）
+
+**現在の仕様書（誤り）:**
 ```json
 "converted_files": {
   "template-456": "documents/tenant-001/doc-xxx/converted_template-456.xlsx"
 }
 ```
 
-この仕様に合わせて実装を修正してください。
+**実際の実装（正しい）:**
+```json
+"converted_files": [
+  {
+    "template_id": "template-456",
+    "template_name": "標準テンプレート",
+    "file_key": "documents/tenant-001/doc-xxx/converted_template-456.xlsx",
+    "converted_at": 1234567890
+  }
+]
+```
+
+**対応:** API仕様書を実装に合わせて更新する必要があります。
+
+## 2. AI処理APIのエンドポイント不一致
+
+### 概要
+ブラッシュアップAPI（文章改善）と紹介文生成APIのエンドポイントパスとレスポンス形式が、仕様書とバックエンド実装で異なります。
+
+### 問題点
+
+#### 2.1 エンドポイントパスの不一致
+
+| API | 仕様書 | バックエンド実装 | 状況 |
+|-----|--------|----------------|------|
+| ブラッシュアップ | `POST /documents/{document_id}/enhance` | `POST /sheets/{sheet_id}/brushup` | ⚠️ 不一致 |
+| 紹介文生成 | `POST /documents/{document_id}/summary` | `POST /sheets/{sheet_id}/intro` | ⚠️ 不一致 |
+
+**影響:**
+- フロントエンドは `/documents` パスを呼び出すが、バックエンドは `/sheets` で実装されている
+- 404エラーが発生する可能性がある
+
+#### 2.2 レスポンス形式の不一致
+
+**ブラッシュアップAPI:**
+
+仕様書（非同期）:
+```json
+{
+  "job_id": "job-123e4567-e89b-12d3-a456-426614174000",
+  "status": "queued"
+}
+```
+
+バックエンド実装（同期）:
+```json
+{
+  "candidates": [
+    "改善された文章1",
+    "改善された文章2",
+    "改善された文章3"
+  ]
+}
+```
+
+**紹介文生成API:**
+
+仕様書（非同期）:
+```json
+{
+  "job_id": "job-123e4567-e89b-12d3-a456-426614174000",
+  "status": "queued"
+}
+```
+
+バックエンド実装（同期）:
+```json
+{
+  "text": "生成された紹介文..."
+}
+```
+
+**影響:**
+- フロントエンドはジョブポーリングを試みるが、バックエンドは即座に結果を返す
+- OpenAI APIの処理時間が長い場合、タイムアウトが発生する可能性がある
+- スケーラビリティに問題がある
+
+#### 2.3 リクエストボディの不一致
+
+**ブラッシュアップAPI:**
+
+仕様書:
+```json
+{
+  "field_path": "self_pr",
+  "instructions": "より具体的に、成果を強調して"
+}
+```
+
+バックエンド実装:
+```json
+{
+  "text": "改善したい文章"
+}
+```
+
+**影響:**
+- バックエンドは `field_path` と `instructions` パラメータをサポートしていない
+- 構造化データの特定フィールドを指定してブラッシュアップできない
+- ユーザーの指示に基づいたカスタマイズができない
+
+### 推奨される修正内容
+
+#### 修正案1: バックエンドを仕様書に合わせる（推奨）
+
+**ファイル:** `src/services/api/app/routers/sheets.py` または該当するルーターファイル
+
+```python
+# 現在のエンドポイント
+@router.post("/{sheet_id}/brushup")
+async def brush_up(
+    sheet_id: str,
+    payload: BrushUpRequest,
+    request: Request,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> dict:
+    _ensure_sheet_exists(request, ctx, sheet_id)
+    ai: AIService = request.app.state.ai
+    candidates = ai.brush_up(payload.text)
+    return {"candidates": candidates}
+
+@router.post("/{sheet_id}/intro")
+async def intro(
+    sheet_id: str,
+    request: Request,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> IntroResponse:
+    # ... 同期処理 ...
+    return IntroResponse(text=text)
+
+# 修正後: /documents パスで非同期ジョブベースに変更
+@router.post("/{document_id}/enhance")
+async def enhance_field(
+    document_id: str,
+    payload: EnhanceRequest,  # field_path と instructions を含む
+    request: Request,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> ExtractResponse:
+    """特定フィールドをブラッシュアップ（非同期処理）"""
+    repository: Repository = request.app.state.repository
+
+    # ドキュメントの存在確認
+    document = repository.get_document(ctx.tenant_id, document_id)
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # ジョブIDを生成
+    job_id = repository.new_identifier("job")
+
+    # ジョブをキューに追加
+    job = Job(
+        job_id=job_id,
+        tenant_id=ctx.tenant_id,
+        document_id=document_id,
+        type=JobType.ENHANCE,
+        status="queued",
+        metadata={
+            "field_path": payload.field_path,
+            "instructions": payload.instructions
+        }
+    )
+    await enqueue_job(job)
+
+    return ExtractResponse(job_id=job_id, status="queued")
+
+@router.post("/{document_id}/summary")
+async def generate_summary(
+    document_id: str,
+    request: Request,
+    ctx: TenantContext = Depends(get_tenant_context),
+) -> ExtractResponse:
+    """営業用紹介文を生成（非同期処理）"""
+    repository: Repository = request.app.state.repository
+
+    # ドキュメントの存在確認
+    document = repository.get_document(ctx.tenant_id, document_id)
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # ジョブIDを生成
+    job_id = repository.new_identifier("job")
+
+    # ジョブをキューに追加
+    job = Job(
+        job_id=job_id,
+        tenant_id=ctx.tenant_id,
+        document_id=document_id,
+        type=JobType.SUMMARY,
+        status="queued"
+    )
+    await enqueue_job(job)
+
+    return ExtractResponse(job_id=job_id, status="queued")
+```
+
+**リクエストモデルの追加:**
+
+```python
+class EnhanceRequest(BaseModel):
+    field_path: str
+    instructions: Optional[str] = None
+
+class ExtractResponse(BaseModel):
+    job_id: str
+    status: str
+```
+
+**ワーカー側の処理:**
+
+```python
+async def process_enhance_job(job: Job):
+    """ブラッシュアップジョブの処理"""
+    # メタデータから情報取得
+    field_path = job.metadata["field_path"]
+    instructions = job.metadata.get("instructions")
+
+    # 構造化データを取得
+    structured_data = repository.get_structured_data(job.tenant_id, job.document_id, job.template_id)
+
+    # field_pathで指定されたフィールドを取得
+    field_value = get_nested_field(structured_data, field_path)
+
+    # AI処理
+    ai: AIService = get_ai_service()
+    improved_value = await ai.brush_up_field(
+        field_value=field_value,
+        context=structured_data,
+        instructions=instructions
+    )
+
+    # 結果を保存（_improvedサフィックス付き）
+    improved_field_path = f"{field_path}_improved"
+    set_nested_field(structured_data, improved_field_path, improved_value)
+    repository.save_structured_data(job.tenant_id, job.document_id, job.template_id, structured_data)
+
+    # ジョブを成功として更新
+    job.status = "succeeded"
+    job.output = {"improved_field": improved_field_path, "value": improved_value}
+    repository.update_job(job)
+
+async def process_summary_job(job: Job):
+    """紹介文生成ジョブの処理"""
+    # 構造化データを取得
+    structured_data = repository.get_structured_data(job.tenant_id, job.document_id, job.template_id)
+
+    # AI処理
+    ai: AIService = get_ai_service()
+    introduction = await ai.generate_introduction(structured_data)
+
+    # 結果を保存（generated_introductionフィールド）
+    structured_data["generated_introduction"] = introduction
+    repository.save_structured_data(job.tenant_id, job.document_id, job.template_id, structured_data)
+
+    # ジョブを成功として更新
+    job.status = "succeeded"
+    job.output = {"generated_introduction": introduction}
+    repository.update_job(job)
+```
+
+#### メリット
+
+1. **仕様書に準拠**: フロントエンドが期待する動作になる
+2. **スケーラビリティ**: 長時間のAI処理でもタイムアウトしない
+3. **一貫性**: 他のAPIエンドポイント（extract, convertなど）と同じ非同期パターン
+4. **柔軟性**: `field_path` と `instructions` により、ユーザーの意図に応じたブラッシュアップが可能
+
+### フロントエンドの対応状況
+
+✅ **既に仕様書通りに実装済み**
+
+**ファイル:** `ui/lib/api-client.ts` (行202-217)
+```typescript
+async enhanceField(
+  documentId: string,
+  fieldPath: string,
+  instructions?: string
+): Promise<ExtractResponse> {
+  const { data } = await this.client.post<ExtractResponse>(
+    `/documents/${documentId}/enhance`,
+    { field_path: fieldPath, instructions }
+  );
+  return data;
+}
+
+async generateSummary(documentId: string): Promise<ExtractResponse> {
+  const { data } = await this.client.post<ExtractResponse>(`/documents/${documentId}/summary`);
+  return data;
+}
+```
+
+**ファイル:** `ui/components/documents/structure-editor.tsx` (行44-66)
+- ブラッシュアップ機能は実装済み・UI使用中
+- 紹介文生成機能は未使用（今回追加予定）
 
 ## 実装優先度
 
-**優先度: 高**
+### ✅ 優先度1: 完了（converted_files形式統一）
+
+**対応日:** 2025-11-05
+**対応内容:**
+- フロントエンドを配列オブジェクト形式に対応
+- 型定義の追加（`ConvertedFile` インターフェース）
+- コンポーネントの修正（`convert-form.tsx`）
+
+**残タスク:**
+- API仕様書の更新（実装に合わせて記述を修正）
+
+### 優先度2: 高（AI処理APIエンドポイント修正）
 
 理由:
-- ユーザー体験に直接影響
-- API仕様書との不整合がある
-- フロントエンドは既に対応済みのため、バックエンド修正のみで完了
-
-## 質問・相談
-
-この修正について質問がある場合は、以下を確認してください:
-1. 現在のバックエンド実装（どこで配列に変換されているか）
-2. DynamoDBのスキーマ定義
-3. 変換処理を行っている関数/メソッド
+- フロントエンドの機能が正しく動作しない可能性
+- 仕様書との重大な不一致
+- スケーラビリティとユーザー体験の向上
+- 紹介文生成機能を追加する際にも必要
 
 ---
 
 **作成日:** 2025-11-05
-**フロントエンド対応:** 完了済み
-**バックエンド対応:** 未実施
+**最終更新:** 2025-11-05
+**フロントエンド対応:** ✅ 完了
+**バックエンド対応:** ✅ 既に実装済み（配列オブジェクト形式）
+**API仕様書更新:** ⚠️ 未実施（要更新）

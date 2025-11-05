@@ -8,11 +8,11 @@ import { Select } from '@/components/ui/select';
 import { Loader2, FileDown, Download } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { toast } from 'sonner';
-import type { Template, Job } from '@/types';
+import type { Template, Job, ConvertedFile } from '@/types';
 
 interface ConvertFormProps {
   documentId: string;
-  convertedFiles?: { [template_id: string]: string } | string[]; // template_id -> S3 file key or array
+  convertedFiles?: ConvertedFile[];
   onConvertComplete?: () => void;
 }
 
@@ -26,13 +26,6 @@ export function ConvertForm({ documentId, convertedFiles, onConvertComplete }: C
   const extractFilename = (s3Path: string): string => {
     const parts = s3Path.split('/');
     return parts[parts.length - 1] || s3Path;
-  };
-
-  // Helper function to extract template ID from filename
-  const extractTemplateIdFromFilename = (filename: string): string | null => {
-    // Match pattern like "converted_<template-id>.xlsx"
-    const match = filename.match(/converted_([a-f0-9-]+)\./);
-    return match ? match[1] : null;
   };
 
   useEffect(() => {
@@ -171,7 +164,7 @@ export function ConvertForm({ documentId, convertedFiles, onConvertComplete }: C
         </CardContent>
       </Card>
 
-      {convertedFiles && (Array.isArray(convertedFiles) ? convertedFiles.length > 0 : Object.keys(convertedFiles).length > 0) && (
+      {convertedFiles && convertedFiles.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle>変換済みファイル</CardTitle>
@@ -180,87 +173,38 @@ export function ConvertForm({ documentId, convertedFiles, onConvertComplete }: C
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
-            {Array.isArray(convertedFiles) ? (
-              // Handle array format (current backend response)
-              convertedFiles.map((fileKey, index) => {
-                const filename = extractFilename(fileKey);
-                const templateId = extractTemplateIdFromFilename(filename);
-                const template = templateId ? templates.find(t => t.template_id === templateId) : null;
+            {convertedFiles.map((convertedFile, index) => {
+              const filename = extractFilename(convertedFile.file_key);
 
-                return (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between p-3 border rounded-lg"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{filename}</p>
-                      {template && (
-                        <p className="text-sm text-muted-foreground">
-                          テンプレート: {template.name}
-                        </p>
-                      )}
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleDownload(templateId || index.toString())}
-                      disabled={downloading === (templateId || index.toString())}
-                    >
-                      {downloading === (templateId || index.toString()) ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <>
-                          <Download className="h-4 w-4 mr-2" />
-                          ダウンロード
-                        </>
-                      )}
-                    </Button>
+              return (
+                <div
+                  key={convertedFile.template_id || index}
+                  className="flex items-center justify-between p-3 border rounded-lg"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate">{filename}</p>
+                    <p className="text-sm text-muted-foreground">
+                      テンプレート: {convertedFile.template_name}
+                    </p>
                   </div>
-                );
-              })
-            ) : (
-              // Handle object format (expected backend response)
-              Object.entries(convertedFiles).map(([templateId, fileKeyOrObject]) => {
-                // Handle both string and object formats from API
-                const fileKey = typeof fileKeyOrObject === 'string'
-                  ? fileKeyOrObject
-                  : (fileKeyOrObject as any)?.file_key;
-
-                const filename = extractFilename(fileKey);
-                const template = templates.find(t => t.template_id === templateId);
-
-                return (
-                  <div
-                    key={templateId}
-                    className="flex items-center justify-between p-3 border rounded-lg"
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleDownload(convertedFile.template_id)}
+                    disabled={downloading === convertedFile.template_id}
                   >
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{filename}</p>
-                      {template && (
-                        <p className="text-sm text-muted-foreground">
-                          テンプレート: {template.name}
-                        </p>
-                      )}
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleDownload(templateId)}
-                      disabled={downloading === templateId}
-                    >
-                      {downloading === templateId ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <>
-                          <Download className="h-4 w-4 mr-2" />
-                          ダウンロード
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                );
-              })
-            )}
+                    {downloading === convertedFile.template_id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <>
+                        <Download className="h-4 w-4 mr-2" />
+                        ダウンロード
+                      </>
+                    )}
+                  </Button>
+                </div>
+              );
+            })}
           </CardContent>
         </Card>
       )}

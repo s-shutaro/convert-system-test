@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Loader2, Save, Sparkles } from 'lucide-react';
+import { Loader2, Save, Sparkles, FileText } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { toast } from 'sonner';
 
@@ -21,6 +21,7 @@ export function StructureEditor({ documentId, templateId, initialData, onSave }:
   const [data, setData] = useState<any>(initialData || {});
   const [saving, setSaving] = useState(false);
   const [enhancing, setEnhancing] = useState(false);
+  const [generatingSummary, setGeneratingSummary] = useState(false);
 
   useEffect(() => {
     if (initialData) {
@@ -62,6 +63,30 @@ export function StructureEditor({ documentId, templateId, initialData, onSave }:
       toast.error(error.response?.data?.detail || 'ブラッシュアップに失敗しました');
     } finally {
       setEnhancing(false);
+    }
+  };
+
+  const handleGenerateSummary = async () => {
+    setGeneratingSummary(true);
+    try {
+      const response = await apiClient.generateSummary(documentId);
+      toast.info('紹介文の生成を開始しました');
+
+      // Poll for completion
+      const job = await apiClient.waitForJob(response.job_id);
+
+      if (job.status === 'succeeded' || job.status === 'completed') {
+        // Reload structure to get the generated_introduction field
+        const updatedStructure = await apiClient.getStructuredData(documentId, templateId);
+        setData(updatedStructure.structured_data);
+        toast.success('紹介文の生成が完了しました');
+      } else {
+        toast.error('紹介文の生成に失敗しました');
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.detail || '紹介文の生成に失敗しました');
+    } finally {
+      setGeneratingSummary(false);
     }
   };
 
@@ -283,6 +308,48 @@ export function StructureEditor({ documentId, templateId, initialData, onSave }:
             )}
           </div>
         )}
+
+        {/* Generated Introduction */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold">営業用紹介文</h3>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleGenerateSummary}
+              disabled={generatingSummary}
+            >
+              {generatingSummary ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  生成中
+                </>
+              ) : (
+                <>
+                  <FileText className="mr-2 h-4 w-4" />
+                  紹介文を生成
+                </>
+              )}
+            </Button>
+          </div>
+          <div className="text-sm text-muted-foreground">
+            構造化データ全体から営業用の紹介文を自動生成します
+          </div>
+          {data.generated_introduction ? (
+            <Textarea
+              value={getField('generated_introduction')}
+              onChange={(e) => updateField('generated_introduction', e.target.value)}
+              rows={8}
+              className="max-h-[300px] overflow-y-auto resize-none"
+              placeholder="「紹介文を生成」ボタンをクリックして紹介文を作成してください"
+            />
+          ) : (
+            <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
+              まだ紹介文が生成されていません。<br />
+              「紹介文を生成」ボタンをクリックして作成してください。
+            </div>
+          )}
+        </div>
       </CardContent>
     </Card>
   );

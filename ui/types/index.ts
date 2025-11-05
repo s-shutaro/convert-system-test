@@ -1,10 +1,18 @@
+// Converted file metadata
+export interface ConvertedFile {
+  template_id: string;
+  template_name: string;
+  file_key: string;
+  converted_at: number;
+}
+
 // Document types (API v3.0.0)
 export interface Document {
   document_id: string;
   tenant: string;
   filename: string;
   file_key: string;
-  converted_files?: { [template_id: string]: string }; // template_id -> S3 file key
+  converted_files?: ConvertedFile[]; // Array of converted file metadata
   created_at: number;
   updated_at: number;
 }
