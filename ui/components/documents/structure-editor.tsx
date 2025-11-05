@@ -206,6 +206,7 @@ export function StructureEditor({ documentId, templateId, initialData, onSave }:
                           setData({ ...data, work_experience: newExp });
                         }}
                         rows={3}
+                        className="max-h-[150px] overflow-y-auto resize-none"
                       />
                     </div>
                   )}
@@ -267,6 +268,7 @@ export function StructureEditor({ documentId, templateId, initialData, onSave }:
               value={getField('self_pr')}
               onChange={(e) => updateField('self_pr', e.target.value)}
               rows={6}
+              className="max-h-[250px] overflow-y-auto resize-none"
             />
             {data.self_pr_improved && (
               <div>
@@ -275,7 +277,7 @@ export function StructureEditor({ documentId, templateId, initialData, onSave }:
                   value={getField('self_pr_improved')}
                   onChange={(e) => updateField('self_pr_improved', e.target.value)}
                   rows={6}
-                  className="mt-2 border-green-300"
+                  className="mt-2 border-green-300 max-h-[250px] overflow-y-auto resize-none"
                 />
               </div>
             )}

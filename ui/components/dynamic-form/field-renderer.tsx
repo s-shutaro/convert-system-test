@@ -59,7 +59,7 @@ export function FieldRenderer({
             value={value || ''}
             onChange={(e) => onChange(fieldPath, e.target.value)}
             placeholder="入力してください"
-            className="min-h-[100px]"
+            className="min-h-[100px] max-h-[300px] overflow-y-auto resize-none"
           />
         ) : (
           <Input
