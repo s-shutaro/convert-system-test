@@ -119,21 +119,60 @@ export function DynamicStructureEditor({
   // ネストされたパスに対応したフィールド更新
   const handleFieldChange = (path: string, value: any) => {
     const keys = path.split('.');
-    const newData = { ...data };
+
+    // ディープコピーを実装
+    const deepClone = (obj: any): any => {
+      if (obj === null || typeof obj !== 'object') return obj;
+      if (Array.isArray(obj)) return obj.map(item => deepClone(item));
+      const cloned: any = {};
+      Object.keys(obj).forEach(key => {
+        cloned[key] = deepClone(obj[key]);
+      });
+      return cloned;
+    };
+
+    const newData = deepClone(data);
     let current: any = newData;
 
     for (let i = 0; i < keys.length - 1; i++) {
       const key = keys[i];
-      if (!current[key]) {
-        // 次のキーが数値かどうかで配列かオブジェクトか判定
-        const nextKey = keys[i + 1];
-        current[key] = /^\d+$/.test(nextKey) ? [] : {};
+      const isArrayIndex = /^\d+$/.test(key);
+
+      if (isArrayIndex) {
+        // 配列インデックスの場合
+        const index = parseInt(key, 10);
+        if (!Array.isArray(current)) {
+          current = [];
+        }
+        // 配列要素が存在しない場合は初期化
+        if (!current[index]) {
+          const nextKey = keys[i + 1];
+          current[index] = /^\d+$/.test(nextKey) ? [] : {};
+        }
+        current = current[index];
+      } else {
+        // オブジェクトキーの場合
+        if (!current[key]) {
+          const nextKey = keys[i + 1];
+          current[key] = /^\d+$/.test(nextKey) ? [] : {};
+        }
+        current = current[key];
       }
-      current = current[key];
     }
 
     const lastKey = keys[keys.length - 1];
-    current[lastKey] = value;
+    const isArrayIndex = /^\d+$/.test(lastKey);
+
+    if (isArrayIndex) {
+      const index = parseInt(lastKey, 10);
+      if (!Array.isArray(current)) {
+        current = [];
+      }
+      current[index] = value;
+    } else {
+      current[lastKey] = value;
+    }
+
     setData(newData);
   };
 

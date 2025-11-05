@@ -126,7 +126,7 @@ export function ArrayFieldRenderer({
                     fieldLabel="項目"
                     itemSchema={itemSchema[0]}
                     value={item || []}
-                    onChange={(_, newValue) => handleItemChange(index, newValue)}
+                    onChange={onChange}
                   />
                 ) : typeof itemSchema === 'object' && itemSchema !== null ? (
                   // オブジェクトの場合
@@ -159,10 +159,7 @@ export function ArrayFieldRenderer({
                               fieldLabel={formatLabel(key)}
                               itemSchema={nestedSchema[0]}
                               value={nestedValue || []}
-                              onChange={(path, newValue) => {
-                                const newItem = { ...item, [key]: newValue };
-                                handleItemChange(index, newItem);
-                              }}
+                              onChange={onChange}
                             />
                           ) : (
                             // 通常のフィールド
@@ -170,10 +167,7 @@ export function ArrayFieldRenderer({
                               fieldPath={nestedPath}
                               fieldSchema={nestedSchema}
                               value={nestedValue}
-                              onChange={(path, newValue) => {
-                                const newItem = { ...item, [key]: newValue };
-                                handleItemChange(index, newItem);
-                              }}
+                              onChange={onChange}
                             />
                           )}
                         </div>
@@ -186,7 +180,7 @@ export function ArrayFieldRenderer({
                     fieldPath={`${fieldPath}.${index}`}
                     fieldSchema={itemSchema}
                     value={item}
-                    onChange={(_, newValue) => handleItemChange(index, newValue)}
+                    onChange={onChange}
                   />
                 )}
               </CardContent>
