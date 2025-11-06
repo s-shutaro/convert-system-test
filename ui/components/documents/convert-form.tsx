@@ -65,8 +65,16 @@ export function ConvertForm({ documentId, convertedFiles, onConvertComplete }: C
       if (job.status === 'succeeded' || job.status === 'completed') {
         toast.success('変換が完了しました');
 
-        // Auto download
-        await handleDownload(selectedTemplateId);
+        // Auto download - 失敗しても変換成功を維持
+        try {
+          await handleDownload(selectedTemplateId);
+        } catch (downloadError: any) {
+          console.error('Auto-download failed:', downloadError);
+          toast.warning(
+            'ファイルの自動ダウンロードに失敗しました。「変換済みファイル」から手動でダウンロードしてください。',
+            { duration: 8000 }
+          );
+        }
 
         if (onConvertComplete) {
           onConvertComplete();
