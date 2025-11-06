@@ -1,5 +1,5 @@
 import { Amplify } from 'aws-amplify';
-import { signIn, signOut, getCurrentUser, fetchAuthSession } from 'aws-amplify/auth';
+import { signIn, signOut, getCurrentUser, fetchAuthSession, fetchUserAttributes } from 'aws-amplify/auth';
 
 // Configure Amplify with Cognito settings
 export function configureAuth() {
@@ -40,11 +40,15 @@ export async function logout() {
   }
 }
 
-// Get current authenticated user
+// Get current authenticated user with custom attributes
 export async function getUser() {
   try {
     const user = await getCurrentUser();
-    return user;
+    const attributes = await fetchUserAttributes();
+    return {
+      ...user,
+      ...attributes,
+    };
   } catch (error) {
     return null;
   }

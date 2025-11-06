@@ -202,17 +202,21 @@ class ApiClient {
   async enhanceField(
     documentId: string,
     fieldPath: string,
+    templateId: string,
     instructions?: string
   ): Promise<ExtractResponse> {
     const { data } = await this.client.post<ExtractResponse>(
       `/documents/${documentId}/enhance`,
-      { field_path: fieldPath, instructions }
+      { field_path: fieldPath, template_id: templateId, instructions }
     );
     return data;
   }
 
-  async generateSummary(documentId: string): Promise<ExtractResponse> {
-    const { data } = await this.client.post<ExtractResponse>(`/documents/${documentId}/summary`);
+  async generateSummary(documentId: string, templateId: string): Promise<ExtractResponse> {
+    const { data } = await this.client.post<ExtractResponse>(
+      `/documents/${documentId}/summary`,
+      { template_id: templateId }
+    );
     return data;
   }
 

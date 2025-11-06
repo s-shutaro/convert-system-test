@@ -33,8 +33,8 @@ export default function DocumentDetailPage() {
   const [loading, setLoading] = useState(true);
 
   const setStructuredData = useAppStore((state) => state.setStructuredData);
-  const getStructuredData = useAppStore((state) => state.getStructuredData);
   const getActiveJobForTemplate = useAppStore((state) => state.getActiveJobForTemplate);
+  const structuredDataMap = useAppStore((state) => state.structuredDataMap);
 
   useEffect(() => {
     const loadData = async () => {
@@ -54,7 +54,16 @@ export default function DocumentDetailPage() {
         const urlResponse = await apiClient.getDownloadUrl(documentId, 'original');
         setPdfUrl(urlResponse.download_url);
 
-        await loadStructuresList();
+        // 構造化データ一覧を取得
+        const structuresList = await loadStructuresList();
+
+        // 選択されたテンプレートの詳細データを明示的に取得
+        // これにより、リロード時もgenerated_introductionが表示される
+        if (structuresList && structuresList.length > 0) {
+          const completed = structuresList.find(s => s.status === 'completed');
+          const targetTemplateId = completed ? completed.template_id : structuresList[0].template_id;
+          await loadStructureForTemplate(targetTemplateId);
+        }
       } catch (error: any) {
         toast.error(error.response?.data?.detail || 'データの取得に失敗しました');
       } finally {
@@ -84,7 +93,7 @@ export default function DocumentDetailPage() {
     }
   };
 
-  const loadStructuresList = async () => {
+  const loadStructuresList = async (): Promise<StructuredDataListItem[]> => {
     try {
       const response = await apiClient.listStructuredData(documentId);
       console.log('Structures list response:', response);
@@ -115,10 +124,13 @@ export default function DocumentDetailPage() {
         console.log('Auto-selecting completed template:', completed.template_id);
         setSelectedTemplateId(completed.template_id);
       }
+
+      return response.items || [];
     } catch (error: any) {
       console.log('No structured data available yet');
       setStructures([]);
       setStructuresLoaded(true);
+      return [];
     }
   };
 
@@ -141,6 +153,11 @@ export default function DocumentDetailPage() {
 
   const handleStructureSave = async () => {
     await loadStructureForTemplate(selectedTemplateId);
+  };
+
+  const handleGenerateSummaryComplete = async () => {
+    // 営業文生成完了後、ドキュメントを再取得してgenerated_introductionを更新
+    await loadDocument();
   };
 
   const handleDownloadPDF = async () => {
@@ -178,7 +195,7 @@ export default function DocumentDetailPage() {
   }
 
   const currentStructure = selectedTemplateId
-    ? getStructuredData(documentId, selectedTemplateId)
+    ? structuredDataMap.get(`${documentId}_${selectedTemplateId}`)
     : null;
 
   console.log('Current state:', {
@@ -333,7 +350,9 @@ export default function DocumentDetailPage() {
                           documentId={documentId}
                           templateId={selectedTemplateId}
                           initialData={currentStructure.structured_data}
+                          generatedIntroduction={document.generated_introduction}
                           onSave={handleStructureSave}
+                          onGenerateSummaryComplete={handleGenerateSummaryComplete}
                         />
                       );
                     }
@@ -344,8 +363,10 @@ export default function DocumentDetailPage() {
                         templateId={selectedTemplateId}
                         template={template}
                         initialData={currentStructure.structured_data}
+                        generatedIntroduction={document.generated_introduction}
                         pdfUrl={pdfUrl}
                         onSave={handleStructureSave}
+                        onGenerateSummaryComplete={handleGenerateSummaryComplete}
                       />
                     );
                   })()}

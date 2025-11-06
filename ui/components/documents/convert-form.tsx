@@ -23,12 +23,6 @@ export function ConvertForm({ documentId, convertedFiles, onConvertComplete }: C
   const [converting, setConverting] = useState(false);
   const [downloading, setDownloading] = useState<string | null>(null);
 
-  // Helper function to extract filename from S3 path
-  const extractFilename = (s3Path: string): string => {
-    const parts = s3Path.split('/');
-    return parts[parts.length - 1] || s3Path;
-  };
-
   useEffect(() => {
     loadTemplates();
   }, []);
@@ -183,16 +177,13 @@ export function ConvertForm({ documentId, convertedFiles, onConvertComplete }: C
           </CardHeader>
           <CardContent className="space-y-2">
             {convertedFiles.map((convertedFile, index) => {
-              const filename = extractFilename(convertedFile.file_key);
-
               return (
                 <div
                   key={convertedFile.template_id || index}
                   className="flex items-center justify-between p-3 border rounded-lg"
                 >
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{filename}</p>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="font-medium truncate">
                       テンプレート: {convertedFile.template_name}
                     </p>
                   </div>

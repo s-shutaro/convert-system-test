@@ -25,8 +25,10 @@ interface DynamicStructureEditorProps {
   templateId: string;
   template: Template;
   initialData?: any;
+  generatedIntroduction?: string;
   pdfUrl?: string;
   onSave?: () => void;
+  onGenerateSummaryComplete?: () => void;
 }
 
 /**
@@ -42,8 +44,10 @@ export function DynamicStructureEditor({
   templateId,
   template,
   initialData,
+  generatedIntroduction,
   pdfUrl,
   onSave,
+  onGenerateSummaryComplete,
 }: DynamicStructureEditorProps) {
   const [data, setData] = useState<any>(initialData || {});
   const [saving, setSaving] = useState(false);
@@ -144,15 +148,17 @@ export function DynamicStructureEditor({
   const handleGenerateSummary = async () => {
     setGeneratingSummary(true);
     try {
-      const response = await apiClient.generateSummary(documentId);
+      const response = await apiClient.generateSummary(documentId, templateId);
       toast.info('紹介文の生成を開始しました');
 
       const job = await apiClient.waitForJob(response.job_id);
 
       if (job.status === 'succeeded' || job.status === 'completed') {
-        const updatedStructure = await apiClient.getStructuredData(documentId, templateId);
-        setData(updatedStructure.structured_data);
         toast.success('紹介文の生成が完了しました');
+        // 親コンポーネントでドキュメントを再取得してgenerated_introductionを更新
+        if (onGenerateSummaryComplete) {
+          await onGenerateSummaryComplete();
+        }
       } else if (job.status === 'failed') {
         const errorMsg = getUserFriendlyErrorMessage(job.error);
         toast.error(errorMsg, { duration: 6000 });
@@ -178,7 +184,7 @@ export function DynamicStructureEditor({
     setOriginalValue(currentValue);
 
     try {
-      const response = await apiClient.enhanceField(documentId, fieldPath);
+      const response = await apiClient.enhanceField(documentId, fieldPath, templateId);
       toast.info('ブラッシュアップを開始しました');
 
       const job = await apiClient.waitForJob(response.job_id);
@@ -192,18 +198,20 @@ export function DynamicStructureEditor({
           setEnhancedResult(improvedValue);
           setEnhanceDialogOpen(true);
         } else {
+          setEnhancingField(null);
           toast.error('ブラッシュアップ結果が見つかりませんでした');
         }
       } else if (job.status === 'failed') {
+        setEnhancingField(null);
         const errorMsg = getUserFriendlyErrorMessage(job.error);
         toast.error(errorMsg, { duration: 6000 });
       } else {
+        setEnhancingField(null);
         toast.error('ブラッシュアップに失敗しました');
       }
     } catch (error: any) {
-      toast.error(error.response?.data?.detail || 'ブラッシュアップに失敗しました');
-    } finally {
       setEnhancingField(null);
+      toast.error(error.response?.data?.detail || 'ブラッシュアップに失敗しました');
     }
   };
 
@@ -214,6 +222,7 @@ export function DynamicStructureEditor({
       setEnhanceDialogOpen(false);
       setEnhancedResult(null);
       setOriginalValue(null);
+      setEnhancingField(null);
       toast.success('ブラッシュアップを適用しました');
     }
   };
@@ -223,6 +232,7 @@ export function DynamicStructureEditor({
     setEnhanceDialogOpen(false);
     setEnhancedResult(null);
     setOriginalValue(null);
+    setEnhancingField(null);
   };
 
   // ネストされたパスに対応したフィールド更新
@@ -410,19 +420,17 @@ export function DynamicStructureEditor({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {data.generated_introduction ? (
-            <Textarea
-              value={data.generated_introduction}
-              onChange={(e) => handleFieldChange('generated_introduction', e.target.value)}
-              rows={8}
-              className="max-h-[500px] overflow-y-auto resize-y"
-              placeholder="「紹介文を生成」ボタンをクリックして紹介文を作成してください"
-            />
-          ) : (
-            <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
-              まだ紹介文が生成されていません。<br />
-              「紹介文を生成」ボタンをクリックして作成してください。
-            </div>
+          <Textarea
+            value={generatedIntroduction || ''}
+            readOnly
+            rows={8}
+            className="max-h-[500px] overflow-y-auto resize-y bg-gray-50"
+            placeholder="「紹介文を生成」ボタンをクリックして紹介文を作成してください"
+          />
+          {!generatedIntroduction && (
+            <p className="text-xs text-muted-foreground mt-2">
+              まだ紹介文が生成されていません。「紹介文を生成」ボタンをクリックして作成してください。
+            </p>
           )}
         </CardContent>
       </Card>

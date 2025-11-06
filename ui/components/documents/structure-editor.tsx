@@ -15,10 +15,12 @@ interface StructureEditorProps {
   documentId: string;
   templateId: string;
   initialData?: any;
+  generatedIntroduction?: string;
   onSave?: () => void;
+  onGenerateSummaryComplete?: () => void;
 }
 
-export function StructureEditor({ documentId, templateId, initialData, onSave }: StructureEditorProps) {
+export function StructureEditor({ documentId, templateId, initialData, generatedIntroduction, onSave, onGenerateSummaryComplete }: StructureEditorProps) {
   const [data, setData] = useState<any>(initialData || {});
   const [saving, setSaving] = useState(false);
   const [enhancing, setEnhancing] = useState(false);
@@ -46,7 +48,7 @@ export function StructureEditor({ documentId, templateId, initialData, onSave }:
   const handleEnhance = async (fieldPath: string) => {
     setEnhancing(true);
     try {
-      const response = await apiClient.enhanceField(documentId, fieldPath);
+      const response = await apiClient.enhanceField(documentId, fieldPath, templateId);
       toast.info('ブラッシュアップを開始しました');
 
       // Poll for completion
@@ -76,17 +78,18 @@ export function StructureEditor({ documentId, templateId, initialData, onSave }:
   const handleGenerateSummary = async () => {
     setGeneratingSummary(true);
     try {
-      const response = await apiClient.generateSummary(documentId);
+      const response = await apiClient.generateSummary(documentId, templateId);
       toast.info('紹介文の生成を開始しました');
 
       // Poll for completion
       const job = await apiClient.waitForJob(response.job_id);
 
       if (job.status === 'succeeded' || job.status === 'completed') {
-        // Reload structure to get the generated_introduction field
-        const updatedStructure = await apiClient.getStructuredData(documentId, templateId);
-        setData(updatedStructure.structured_data);
         toast.success('紹介文の生成が完了しました');
+        // 親コンポーネントでドキュメントを再取得してgenerated_introductionを更新
+        if (onGenerateSummaryComplete) {
+          onGenerateSummaryComplete();
+        }
       } else if (job.status === 'failed') {
         // Show user-friendly error message
         const errorMsg = getUserFriendlyErrorMessage(job.error);
@@ -344,19 +347,17 @@ export function StructureEditor({ documentId, templateId, initialData, onSave }:
           <div className="text-sm text-muted-foreground">
             構造化データ全体から営業用の紹介文を自動生成します
           </div>
-          {data.generated_introduction ? (
-            <Textarea
-              value={getField('generated_introduction')}
-              onChange={(e) => updateField('generated_introduction', e.target.value)}
-              rows={8}
-              className="max-h-[500px] overflow-y-auto resize-y"
-              placeholder="「紹介文を生成」ボタンをクリックして紹介文を作成してください"
-            />
-          ) : (
-            <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
-              まだ紹介文が生成されていません。<br />
-              「紹介文を生成」ボタンをクリックして作成してください。
-            </div>
+          <Textarea
+            value={generatedIntroduction || ''}
+            readOnly
+            rows={8}
+            className="max-h-[500px] overflow-y-auto resize-y bg-gray-50"
+            placeholder="「紹介文を生成」ボタンをクリックして紹介文を作成してください"
+          />
+          {!generatedIntroduction && (
+            <p className="text-xs text-muted-foreground mt-2">
+              まだ紹介文が生成されていません。「紹介文を生成」ボタンをクリックして作成してください。
+            </p>
           )}
         </div>
         </>

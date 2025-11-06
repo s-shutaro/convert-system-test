@@ -13,6 +13,7 @@ export interface Document {
   filename: string;
   file_key: string;
   converted_files?: ConvertedFile[]; // Array of converted file metadata
+  generated_introduction?: string; // Generated sales introduction text
   created_at: number;
   updated_at: number;
 }

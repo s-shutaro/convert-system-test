@@ -328,7 +328,8 @@ GET /documents/{document_id}
       "file_key": "documents/tenant-001/doc-xxx/converted_template-456.xlsx",
       "converted_at": 1234567890
     }
-  ]
+  ],
+  "generated_introduction": "氏名:田中太郎\n最寄り駅:東京駅\n\n得意領域:Webアプリケーション開発\n使用技術:Python, FastAPI, React\n経験年数:5年\n\n主な実績:\n- ECサイトの新規開発\n- 社内システムのリプレース\n\n自己PR:スピード感ある開発とチーム協働を得意としています。"
 }
 ```
 
@@ -343,6 +344,7 @@ GET /documents/{document_id}
 | updated_at | number | 更新日時（Unixタイムスタンプ） |
 | file_key | string | S3ファイルキー |
 | converted_files | array | 変換済みファイル一覧（各要素に template_id、template_name、file_key、converted_at を含む） |
+| generated_introduction | string \| null | 生成された営業用紹介文（`POST /documents/{document_id}/summary` で生成された場合のみ存在） |
 
 ---
 
@@ -989,7 +991,8 @@ POST /documents/{document_id}/enhance
 ```json
 {
   "field_path": "self_pr",
-  "instructions": "より具体的に、成果を強調して"
+  "instructions": "より具体的に、成果を強調して",
+  "template_id": "template-123e4567-e89b-12d3-a456-426614174000"
 }
 ```
 
@@ -997,6 +1000,7 @@ POST /documents/{document_id}/enhance
 |------------|-------|------|------|
 | field_path | string | ✓ | 改善対象フィールドのパス（例: `self_pr`, `work_experience.0.description`） |
 | instructions | string | - | 改善の具体的な指示（省略可） |
+| template_id | string | ✓ | テンプレートID |
 
 #### 処理内容
 
@@ -1038,11 +1042,41 @@ POST /documents/{document_id}/summary
 |------------|-------|------|
 | document_id | string | ドキュメントID |
 
+**Request Body**
+
+```json
+{
+  "template_id": "template-123e4567-e89b-12d3-a456-426614174000"
+}
+```
+
+| フィールド | 型 | 必須 | 説明 |
+|------------|-------|------|------|
+| template_id | string | ✓ | テンプレートID |
+
 #### 処理内容
 
 - 構造化データ全体（基本情報、スキル、職務経歴など）から紹介文を生成
-- 生成結果は DynamoDB の `generated_introduction` フィールドに保存される
+- 生成結果は以下の2箇所に保存される:
+  - DynamoDB の `generated_introduction` フィールド（`GET /documents/{document_id}` で取得可能）
+  - S3 (`documents/{tenant}/{document_id}/introduction.txt`)
 - 処理は非同期で実行される
+
+#### 生成された紹介文の取得方法
+
+紹介文は以下の方法で取得できます:
+
+1. **ドキュメント詳細APIから取得** (推奨):
+   ```
+   GET /documents/{document_id}
+   ```
+   レスポンスの `generated_introduction` フィールドに含まれます
+
+2. **ジョブポーリングでS3キーを取得**:
+   ```
+   GET /jobs/{job_id}/poll
+   ```
+   ジョブの `output` フィールドにS3キーが返されます
 
 #### レスポンス例
 
@@ -1233,7 +1267,7 @@ GET /jobs/{job_id}/poll
 
 #### レスポンス例
 
-**成功 (200 OK)**
+**成功時 (200 OK)**
 
 ```json
 {
@@ -1253,6 +1287,31 @@ GET /jobs/{job_id}/poll
 }
 ```
 
+**失敗時 (200 OK - ジョブは存在するがステータスが失敗)**
+
+```json
+{
+  "job_id": "job-123e4567-e89b-12d3-a456-426614174000",
+  "status": "failed",
+  "step": "ai_vision_structure",
+  "output": null,
+  "error": "Failed to structure document: OpenAI API rate limit exceeded. Please retry after 60 seconds.",
+  "updated_at": 1234567890,
+  "tenant": "tenant-001"
+}
+```
+
+#### よくあるエラーメッセージ
+
+| エラーメッセージの例 | 原因 | 対処方法 |
+|---------------------|------|----------|
+| `"OpenAI API rate limit exceeded"` | OpenAI APIのレート制限 | 60秒後に `/documents/{document_id}/reanalyze` でリトライ |
+| `"Request timeout after 300 seconds"` | 処理タイムアウト | `/documents/{document_id}/reanalyze` でリトライ |
+| `"PDF file not found in S3"` | S3からPDFファイルが削除された | ドキュメントを再アップロード |
+| `"Template not found"` | テンプレートが削除された | 有効なテンプレートIDで再実行 |
+| `"template_id is required"` | テンプレートIDが指定されていない | `/documents/{document_id}/extract` を正しいパラメータで再実行 |
+| `"Failed to parse JSON"` | OpenAI APIの出力が不正 | `/documents/{document_id}/reanalyze` でリトライ |
+
 #### cURLサンプル
 
 ```bash
@@ -1262,6 +1321,8 @@ curl "https://api.example.com/jobs/job-123/poll?timeout=30" \
 ```
 
 #### 使用例（JavaScript）
+
+**基本的なポーリング:**
 
 ```javascript
 async function waitForJob(jobId) {
@@ -1278,12 +1339,76 @@ async function waitForJob(jobId) {
 
   if (job.status === 'succeeded' || job.status === 'completed') {
     console.log('Job completed:', job.output);
+    return job;
   } else if (job.status === 'failed') {
     console.error('Job failed:', job.error);
+    throw new Error(job.error);
   } else {
     // まだ処理中の場合は再度ポーリング
-    await waitForJob(jobId);
+    return waitForJob(jobId);
   }
+}
+```
+
+**エラー検知とリトライ付きポーリング:**
+
+```javascript
+async function waitForJobWithRetry(documentId, jobId, retryCount = 0, maxRetries = 3) {
+  const response = await fetch(
+    `https://api.example.com/jobs/${jobId}/poll?timeout=30`,
+    {
+      headers: {
+        'Authorization': `Bearer ${jwt}`
+      }
+    }
+  );
+
+  const job = await response.json();
+
+  if (job.status === 'succeeded' || job.status === 'completed') {
+    console.log('Job completed:', job.output);
+    return job;
+  } else if (job.status === 'failed') {
+    console.error('Job failed:', job.error);
+
+    // リトライ可能なエラーかチェック
+    const isRetryable = job.error?.includes('rate limit') ||
+                        job.error?.includes('timeout') ||
+                        job.error?.includes('Timeout');
+
+    if (isRetryable && retryCount < maxRetries) {
+      console.log(`Retrying... (${retryCount + 1}/${maxRetries})`);
+
+      // リトライAPI呼び出し
+      const retryResponse = await fetch(
+        `https://api.example.com/documents/${documentId}/reanalyze`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${jwt}`
+          }
+        }
+      );
+
+      const retryJob = await retryResponse.json();
+
+      // 新しいjob_idで再ポーリング
+      return waitForJobWithRetry(documentId, retryJob.job_id, retryCount + 1, maxRetries);
+    } else {
+      throw new Error(job.error);
+    }
+  } else {
+    // まだ処理中の場合は再度ポーリング
+    return waitForJobWithRetry(documentId, jobId, retryCount, maxRetries);
+  }
+}
+
+// 使用例
+try {
+  const result = await waitForJobWithRetry('doc-123', 'job-456');
+  console.log('Success:', result);
+} catch (error) {
+  console.error('Failed after retries:', error.message);
 }
 ```
 

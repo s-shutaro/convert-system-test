@@ -43,7 +43,7 @@ export function Header() {
             {!loading && user && (
               <div className="flex items-center gap-4 border-l pl-6">
                 <span className="text-sm text-muted-foreground">
-                  {user.username}
+                  {user.name || user.username}
                 </span>
                 <Button
                   variant="outline"
