@@ -9,6 +9,7 @@ import { Loader2, FileDown, Download } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { toast } from 'sonner';
 import type { Template, Job, ConvertedFile } from '@/types';
+import { getUserFriendlyErrorMessage, getJobStatusMessage } from '@/lib/error-messages';
 
 interface ConvertFormProps {
   documentId: string;
@@ -57,7 +58,9 @@ export function ConvertForm({ documentId, convertedFiles, onConvertComplete }: C
 
       // Poll for completion
       const job = await apiClient.waitForJob(response.job_id, (currentJob: Job) => {
-        toast.info(`処理中: ${currentJob.step}`);
+        // Show user-friendly status message
+        const statusMsg = getJobStatusMessage(currentJob.status, currentJob.step);
+        toast.info(statusMsg);
       });
 
       if (job.status === 'succeeded' || job.status === 'completed') {
@@ -69,8 +72,14 @@ export function ConvertForm({ documentId, convertedFiles, onConvertComplete }: C
         if (onConvertComplete) {
           onConvertComplete();
         }
+      } else if (job.status === 'failed') {
+        // Show user-friendly error message
+        const errorMsg = getUserFriendlyErrorMessage(job.error);
+        toast.error(errorMsg, {
+          duration: 6000,
+        });
       } else {
-        toast.error(`変換に失敗しました: ${job.error || '不明なエラー'}`);
+        toast.error('変換に失敗しました');
       }
     } catch (error: any) {
       toast.error(error.response?.data?.detail || '変換に失敗しました');

@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Loader2, Save, Sparkles, FileText } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { toast } from 'sonner';
+import { getUserFriendlyErrorMessage } from '@/lib/error-messages';
 
 interface StructureEditorProps {
   documentId: string;
@@ -56,6 +57,12 @@ export function StructureEditor({ documentId, templateId, initialData, onSave }:
         const updatedStructure = await apiClient.getStructuredData(documentId, templateId);
         setData(updatedStructure.structured_data);
         toast.success('ブラッシュアップが完了しました');
+      } else if (job.status === 'failed') {
+        // Show user-friendly error message
+        const errorMsg = getUserFriendlyErrorMessage(job.error);
+        toast.error(errorMsg, {
+          duration: 6000,
+        });
       } else {
         toast.error('ブラッシュアップに失敗しました');
       }
@@ -80,6 +87,12 @@ export function StructureEditor({ documentId, templateId, initialData, onSave }:
         const updatedStructure = await apiClient.getStructuredData(documentId, templateId);
         setData(updatedStructure.structured_data);
         toast.success('紹介文の生成が完了しました');
+      } else if (job.status === 'failed') {
+        // Show user-friendly error message
+        const errorMsg = getUserFriendlyErrorMessage(job.error);
+        toast.error(errorMsg, {
+          duration: 6000,
+        });
       } else {
         toast.error('紹介文の生成に失敗しました');
       }

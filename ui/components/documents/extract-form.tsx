@@ -10,6 +10,7 @@ import { apiClient } from '@/lib/api-client';
 import { useAppStore } from '@/lib/store';
 import { toast } from 'sonner';
 import type { Template, AnalysisType, Job } from '@/types';
+import { getUserFriendlyErrorMessage, getJobStatusMessage } from '@/lib/error-messages';
 
 interface ExtractFormProps {
   documentId: string;
@@ -81,7 +82,10 @@ export function ExtractForm({ documentId, onExtractStart, onExtractComplete }: E
           template_id: selectedTemplateId,
         };
         setJob(jobId, enrichedJob);
-        toast.info(`処理中: ${currentJob.step}`);
+
+        // Show user-friendly status message
+        const statusMsg = getJobStatusMessage(currentJob.status, currentJob.step);
+        toast.info(statusMsg);
       });
 
       if (job.status === 'succeeded' || job.status === 'completed') {
@@ -90,7 +94,11 @@ export function ExtractForm({ documentId, onExtractStart, onExtractComplete }: E
           onExtractComplete();
         }
       } else if (job.status === 'failed') {
-        toast.error(`構造抽出に失敗しました: ${job.error || '不明なエラー'}`);
+        // Show user-friendly error message
+        const errorMsg = getUserFriendlyErrorMessage(job.error);
+        toast.error(errorMsg, {
+          duration: 6000, // Show error longer
+        });
       }
     } catch (error: any) {
       toast.error('ジョブの監視に失敗しました');
@@ -154,12 +162,12 @@ export function ExtractForm({ documentId, onExtractStart, onExtractComplete }: E
             onChange={(e) => setAnalysisType(e.target.value as AnalysisType)}
             disabled={loading}
           >
-            <option value="vision">Vision (GPT-4 Vision)</option>
-            <option value="ocr">OCR (Textract)</option>
-            <option value="base64">BASE64 (GPT-4)</option>
+            <option value="vision">Vision (GPT-4/5 Vision - 署名付きURL)</option>
+            <option value="base64">BASE64 (GPT-4/5 Vision)</option>
+            <option value="text">Text (pypdf + GPT-5)</option>
           </Select>
           <p className="text-xs text-muted-foreground">
-            Vision: レイアウト保持、手書き対応 / OCR: 高速、テキスト精度高 / BASE64: Visionと同様
+            Vision: レイアウト保持、手書き対応 / BASE64: Visionと同様 / Text: 高速・低コスト（失敗時Visionフォールバック）
           </p>
         </div>
 
