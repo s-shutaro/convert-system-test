@@ -103,5 +103,5 @@ export interface ApiError {
   detail: string;
 }
 
-// Analysis types
-export type AnalysisType = 'ocr' | 'vision' | 'base64';
+// Analysis types (API v3.0.0)
+export type AnalysisType = 'vision' | 'base64' | 'text';

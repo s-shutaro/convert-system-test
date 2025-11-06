@@ -13,7 +13,6 @@
 
 ### 処理方式
 
-- **OCR方式**: Amazon Textract でテキスト抽出 → OpenAI で構造化
 - **Vision方式**: PDF を OpenAI GPT-4/5 Vision で直接分析・構造化（署名付きURL使用）
 - **BASE64方式**: PDF を BASE64 エンコード → OpenAI GPT-4/5 で直接分析・構造化
 - **Text方式**: pypdf でテキスト抽出 → GPT-5 で構造化（失敗時はVisionフォールバック）
@@ -243,15 +242,15 @@ POST /documents/{document_id}/extract
 | フィールド | 型 | 必須 | 説明 |
 |------------|-------|------|------|
 | template_id | string | ✓ | 使用するテンプレートのID（変数定義を取得するため） |
-| analysis_type | string | ✓ | 処理方式: `ocr`, `vision`, `base64` |
+| analysis_type | string | ✓ | 処理方式: `vision`, `base64`, `text` |
 
 #### 処理方式の詳細
 
 | 方式 | 説明 | メリット | デメリット |
 |------|------|----------|----------|
-| **ocr** | Textract → OpenAI | 高速、テキスト抽出精度が高い | レイアウト情報が失われる |
-| **vision** | 署名付きURL → GPT-4 Vision | レイアウトを保持、手書き文字も認識 | コスト高、処理時間長 |
-| **base64** | BASE64 → GPT-4 Vision | visionと同様 | ファイルサイズに制限 |
+| **vision** | 署名付きURL → GPT-4/5 Vision | レイアウトを保持、手書き文字も認識 | コスト高、処理時間長 |
+| **base64** | BASE64 → GPT-4/5 Vision | visionと同様 | ファイルサイズに制限 |
+| **text** | pypdf テキスト抽出 → GPT-5 | 高速、低コスト（失敗時はVisionフォールバック） | レイアウト情報が失われる |
 
 #### レスポンス例
 
@@ -322,9 +321,14 @@ GET /documents/{document_id}
   "created_at": 1234567890,
   "updated_at": 1234567890,
   "file_key": "documents/tenant-001/doc-xxx/skillsheet.pdf",
-  "converted_files": {
-    "template-456": "documents/tenant-001/doc-xxx/converted_template-456.xlsx"
-  }
+  "converted_files": [
+    {
+      "template_id": "template-456",
+      "template_name": "標準テンプレート",
+      "file_key": "documents/tenant-001/doc-xxx/converted_template-456.xlsx",
+      "converted_at": 1234567890
+    }
+  ]
 }
 ```
 
@@ -338,7 +342,7 @@ GET /documents/{document_id}
 | created_at | number | 作成日時（Unixタイムスタンプ） |
 | updated_at | number | 更新日時（Unixタイムスタンプ） |
 | file_key | string | S3ファイルキー |
-| converted_files | object | 変換済みファイル（キー: template_id、値: S3ファイルキー） |
+| converted_files | array | 変換済みファイル一覧（各要素に template_id、template_name、file_key、converted_at を含む） |
 
 ---
 
@@ -1556,102 +1560,10 @@ try {
 
 ---
 
-## 既知の実装差異
-
-### 重要な注意事項
-
-現在のバックエンド実装と本仕様書の間にはいくつかの差異があります。フロントエンドは本仕様書に従って実装されているため、以下の点に注意してください。
-
-#### 1. エンドポイントパスの差異
-
-| 仕様書 | バックエンド実装 | 状況 |
-|--------|----------------|------|
-| `POST /documents/{document_id}/enhance` | `POST /sheets/{sheet_id}/brushup` | ⚠️ パス不一致 |
-| `POST /documents/{document_id}/summary` | `POST /sheets/{sheet_id}/intro` | ⚠️ パス不一致 |
-
-**影響範囲:**
-- フロントエンドは仕様書通りの `/documents` エンドポイントを呼び出す
-- バックエンドは `/sheets` エンドポイントで実装されている
-- ルーティング設定またはバックエンド修正が必要
-
-#### 2. レスポンス形式の差異
-
-**ブラッシュアップAPI (`/enhance`):**
-- **仕様書**: 非同期処理 → `{ "job_id": "...", "status": "queued" }` を返却
-- **バックエンド実装**: 同期処理 → `{ "candidates": [...] }` を即座に返却
-
-**紹介文生成API (`/summary`):**
-- **仕様書**: 非同期処理 → `{ "job_id": "...", "status": "queued" }` を返却
-- **バックエンド実装**: 同期処理 → `{ "text": "..." }` を即座に返却
-
-**影響:**
-- フロントエンドはジョブポーリングを実行するが、バックエンドは即座に結果を返す
-- ユーザー体験とスケーラビリティのため、非同期処理への移行を推奨
-
-#### 3. リクエストボディの差異
-
-**ブラッシュアップAPI:**
-- **仕様書**: `{ "field_path": "self_pr", "instructions": "..." }`
-- **バックエンド実装**: `{ "text": "..." }`
-
-**影響:**
-- バックエンドは `field_path` と `instructions` パラメータをサポートしていない
-- フィールド単位でのブラッシュアップが機能しない
-
-#### 4. 抽出方式の差異
-
-**仕様書に記載の4方式:**
-1. OCR方式 (`ocr`)
-2. Vision方式 (`vision`)
-3. BASE64方式 (`base64`)
-4. Text方式 (`text`)
-
-**バックエンド実装:**
-```python
-class ExtractionMode(str, Enum):
-    TEXT = "text"
-    OCR_TEXTRACT = "ocr_textract"
-    VISION_LLM = "vision_llm"
-```
-
-**マッピング:**
-- `ocr` → `ocr_textract`
-- `vision` → `vision_llm`
-- `base64` → `vision_llm` (同じ処理)
-- `text` → `text`
-
-**影響:**
-- フロントエンドが送信する `analysis_type` 値とバックエンドのenum値が異なる可能性がある
-- API Gateway層でのマッピングまたはバックエンド修正が必要
-
-#### 5. converted_filesフィールドの形式
-
-詳細は [BACKEND_MODIFICATION_REQUIRED.md](../BACKEND_MODIFICATION_REQUIRED.md) を参照してください。
-
-- **仕様書**: オブジェクト形式 `{ "template-456": "s3-key" }`
-- **バックエンド実装**: 配列形式 `["s3-key-1", "s3-key-2"]`
-- **フロントエンド**: 両方の形式に対応済み
-
-### 推奨される対応
-
-**優先度: 高**
-
-1. バックエンドAPIパスを `/documents` に統一
-2. ブラッシュアップ・紹介文生成APIを非同期処理化
-3. リクエストボディスキーマを仕様書に合わせる
-4. `converted_files` をオブジェクト形式に変更
-
-**または**
-
-本仕様書を現在の実装に合わせて更新（非推奨）
-
----
-
 ## 変更履歴
 
 | バージョン | 日付 | 変更内容 |
 |-----------|------|----------|
-| 3.1.0 | 2025-11-05 | 既知の実装差異セクションを追加 |
 | 3.0.0 | 2025-01-29 | マルチテンプレート対応: structured_data_tableの導入、新しい構造化データAPI追加 |
 | 2.0.0 | 2025-01-XX | 初版作成 |
 
@@ -1669,7 +1581,12 @@ interface Document {
   tenant: string;
   filename: string;
   file_key: string;
-  converted_files?: { [template_id: string]: string };
+  converted_files?: Array<{
+    template_id: string;
+    template_name: string;
+    file_key: string;
+    converted_at: number;
+  }>;
   created_at: number;
   updated_at: number;
 }
