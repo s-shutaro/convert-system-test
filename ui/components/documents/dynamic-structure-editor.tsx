@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Loader2, Save, Eye, Edit3, X, Sparkles, FileText } from 'lucide-react';
+import { Loader2, Save, Eye, Edit3, X, Sparkles, FileText, Copy, Check } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { apiClient } from '@/lib/api-client';
@@ -61,6 +61,7 @@ export function DynamicStructureEditor({
   const [enhancedResult, setEnhancedResult] = useState<string | null>(null);
   const [originalValue, setOriginalValue] = useState<string | null>(null);
   const [enhanceDialogOpen, setEnhanceDialogOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   // テンプレート変数をパース
   useEffect(() => {
@@ -235,6 +236,27 @@ export function DynamicStructureEditor({
     setEnhancingField(null);
   };
 
+  // 紹介文をコピー
+  const handleCopyIntroduction = async () => {
+    if (!generatedIntroduction) {
+      toast.error('コピーする紹介文がありません');
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(generatedIntroduction);
+      setCopied(true);
+      toast.success('紹介文をコピーしました');
+
+      // 2秒後にアイコンを元に戻す
+      setTimeout(() => {
+        setCopied(false);
+      }, 2000);
+    } catch (error) {
+      toast.error('コピーに失敗しました');
+    }
+  };
+
   // ネストされたパスに対応したフィールド更新
   const handleFieldChange = (path: string, value: any) => {
     const keys = path.split('.');
@@ -396,24 +418,46 @@ export function DynamicStructureEditor({
               <FileText className="h-5 w-5" />
               営業用紹介文
             </span>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleGenerateSummary}
-              disabled={generatingSummary}
-            >
-              {generatingSummary ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  生成中
-                </>
-              ) : (
-                <>
-                  <Sparkles className="mr-2 h-4 w-4" />
-                  紹介文を生成
-                </>
+            <div className="flex gap-2">
+              {generatedIntroduction && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleCopyIntroduction}
+                  disabled={!generatedIntroduction}
+                >
+                  {copied ? (
+                    <>
+                      <Check className="mr-2 h-4 w-4 text-green-600" />
+                      コピー済み
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="mr-2 h-4 w-4" />
+                      コピー
+                    </>
+                  )}
+                </Button>
               )}
-            </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleGenerateSummary}
+                disabled={generatingSummary}
+              >
+                {generatingSummary ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    生成中
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    紹介文を生成
+                  </>
+                )}
+              </Button>
+            </div>
           </CardTitle>
           <CardDescription>
             構造化データ全体から営業用の紹介文を自動生成します

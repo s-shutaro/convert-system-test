@@ -54,7 +54,12 @@ export function ConvertForm({ documentId, convertedFiles, onConvertComplete }: C
       const job = await apiClient.waitForJob(response.job_id, (currentJob: Job) => {
         // Show user-friendly status message
         const statusMsg = getJobStatusMessage(currentJob.status, currentJob.step);
-        toast.info(statusMsg);
+        if (currentJob.status === 'failed') {
+          const errorMsg = getUserFriendlyErrorMessage(currentJob.error);
+          toast.error(errorMsg, { duration: 6000 });
+        } else {
+          toast.info(statusMsg);
+        }
       });
 
       if (job.status === 'succeeded' || job.status === 'completed') {
