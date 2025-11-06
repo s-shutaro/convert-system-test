@@ -113,7 +113,7 @@ export function UploadTemplate({ onSuccess }: UploadTemplateProps) {
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>テンプレート登録</DialogTitle>
             <DialogDescription>
@@ -193,7 +193,7 @@ export function UploadTemplate({ onSuccess }: UploadTemplateProps) {
   "work_experience": [],
   "skills": []
 }`}
-                rows={8}
+                rows={6}
                 className="font-mono text-sm"
               />
               <p className="text-xs text-muted-foreground">

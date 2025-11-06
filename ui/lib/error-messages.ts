@@ -57,6 +57,10 @@ export function getUserFriendlyErrorMessage(error: string | undefined | null): s
   }
 
   // 構造化関連のエラー
+  if (errorLower.includes('no structured data found')) {
+    return '構造化データが見つかりません。先にデータ抽出を実行してください。';
+  }
+
   if (errorLower.includes('structure') || errorLower.includes('parsing')) {
     return 'データの構造化に失敗しました。PDFの内容が読み取れない可能性があります。';
   }
