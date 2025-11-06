@@ -133,25 +133,15 @@ export function StructureEditor({ documentId, templateId, initialData, onSave }:
     return current || '';
   };
 
-  if (!data || Object.keys(data).length === 0) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>構造化データ</CardTitle>
-          <CardDescription>
-            構造抽出が完了していないか、データがありません
-          </CardDescription>
-        </CardHeader>
-      </Card>
-    );
-  }
+  // Loading state while waiting for data
+  const hasData = data && Object.keys(data).length > 0;
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <span>構造化データ編集</span>
-          <Button onClick={handleSave} disabled={saving} size="sm">
+          <Button onClick={handleSave} disabled={saving || !hasData} size="sm">
             {saving ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -170,6 +160,12 @@ export function StructureEditor({ documentId, templateId, initialData, onSave }:
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        {!hasData ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <p>構造抽出が完了していないか、データがありません</p>
+          </div>
+        ) : (
+          <>
         {/* Basic Info */}
         {data.basic_info && (
           <div className="space-y-4">
@@ -244,7 +240,7 @@ export function StructureEditor({ documentId, templateId, initialData, onSave }:
                           setData({ ...data, work_experience: newExp });
                         }}
                         rows={3}
-                        className="max-h-[150px] overflow-y-auto resize-none"
+                        className="max-h-[300px] overflow-y-auto resize-y"
                       />
                     </div>
                   )}
@@ -306,7 +302,7 @@ export function StructureEditor({ documentId, templateId, initialData, onSave }:
               value={getField('self_pr')}
               onChange={(e) => updateField('self_pr', e.target.value)}
               rows={6}
-              className="max-h-[250px] overflow-y-auto resize-none"
+              className="max-h-[400px] overflow-y-auto resize-y"
             />
             {data.self_pr_improved && (
               <div>
@@ -315,7 +311,7 @@ export function StructureEditor({ documentId, templateId, initialData, onSave }:
                   value={getField('self_pr_improved')}
                   onChange={(e) => updateField('self_pr_improved', e.target.value)}
                   rows={6}
-                  className="mt-2 border-green-300 max-h-[250px] overflow-y-auto resize-none"
+                  className="mt-2 border-green-300 max-h-[400px] overflow-y-auto resize-y"
                 />
               </div>
             )}
@@ -353,7 +349,7 @@ export function StructureEditor({ documentId, templateId, initialData, onSave }:
               value={getField('generated_introduction')}
               onChange={(e) => updateField('generated_introduction', e.target.value)}
               rows={8}
-              className="max-h-[300px] overflow-y-auto resize-none"
+              className="max-h-[500px] overflow-y-auto resize-y"
               placeholder="「紹介文を生成」ボタンをクリックして紹介文を作成してください"
             />
           ) : (
@@ -363,6 +359,8 @@ export function StructureEditor({ documentId, templateId, initialData, onSave }:
             </div>
           )}
         </div>
+        </>
+        )}
       </CardContent>
     </Card>
   );

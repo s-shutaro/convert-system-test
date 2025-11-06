@@ -3,7 +3,9 @@
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Sparkles, Loader2 } from 'lucide-react';
 
 interface FieldRendererProps {
   fieldPath: string;
@@ -11,6 +13,8 @@ interface FieldRendererProps {
   value: any;
   onChange: (path: string, value: any) => void;
   level?: number;
+  onEnhance?: (fieldPath: string) => void;
+  enhancingField?: string | null;
 }
 
 /**
@@ -27,6 +31,8 @@ export function FieldRenderer({
   value,
   onChange,
   level = 0,
+  onEnhance,
+  enhancingField,
 }: FieldRendererProps) {
 
   // フィールド名をラベル用にフォーマット
@@ -51,23 +57,51 @@ export function FieldRenderer({
     typeof fieldSchema === 'boolean'
   ) {
     const isLongText = typeof fieldSchema === 'string' && fieldSchema.length > 50;
+    const isEnhancing = enhancingField === fieldPath;
+    const hasValue = value && typeof value === 'string' && value.trim().length > 0;
+    const canEnhance = onEnhance && hasValue;
 
     return (
       <div className="space-y-2">
-        {isLongText ? (
-          <Textarea
-            value={value || ''}
-            onChange={(e) => onChange(fieldPath, e.target.value)}
-            placeholder="入力してください"
-            className="min-h-[100px] max-h-[300px] overflow-y-auto resize-none"
-          />
-        ) : (
-          <Input
-            value={value || ''}
-            onChange={(e) => onChange(fieldPath, e.target.value)}
-            placeholder="入力してください"
-          />
-        )}
+        <div className="flex items-start gap-2">
+          <div className="flex-1">
+            {isLongText ? (
+              <Textarea
+                value={value || ''}
+                onChange={(e) => onChange(fieldPath, e.target.value)}
+                placeholder="入力してください"
+                className="min-h-[100px] max-h-[500px] overflow-y-auto resize-y"
+              />
+            ) : (
+              <Input
+                value={value || ''}
+                onChange={(e) => onChange(fieldPath, e.target.value)}
+                placeholder="入力してください"
+              />
+            )}
+          </div>
+          {canEnhance && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => onEnhance(fieldPath)}
+              disabled={isEnhancing || !hasValue}
+              className="shrink-0 mt-1"
+            >
+              {isEnhancing ? (
+                <>
+                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                  処理中
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-3 w-3 mr-1" />
+                  改善
+                </>
+              )}
+            </Button>
+          )}
+        </div>
       </div>
     );
   }
@@ -122,6 +156,8 @@ export function FieldRenderer({
                 value={nestedValue}
                 onChange={onChange}
                 level={level + 1}
+                onEnhance={onEnhance}
+                enhancingField={enhancingField}
               />
             </div>
           );
