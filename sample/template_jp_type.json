@@ -1,0 +1,44 @@
+{
+    "作成日": "date",
+    "基本情報": {
+        "フリガナ": "string",
+        "年齢": "number",
+        "性別": "string",
+        "名前": "string",
+        "経験年数": "number",
+        "最寄り駅": "string"
+    },
+    "保有資格": "string",
+    "保有スキル": {
+        "機種_OS": "string",
+        "言語_ツール": "string"
+    },
+    "自己PR": "string",
+    "経歴": [
+        {
+            "index": "number",
+            "業務期間": {
+                "開始": "date",
+                "終了": "date",
+                "期間": "string"
+            },
+            "プロジェクト": {
+                "概要": "string"
+            },
+            "役割_役職": "string",
+            "人数_規模": "string",
+            "担当工程": {
+                "コンサル": "boolean",
+                "要件定義": "boolean",
+                "基本設計": "boolean",
+                "詳細設計": "boolean",
+                "製造": "boolean",
+                "構築": "boolean",
+                "テスト": "boolean",
+                "運用保守": "boolean",
+                "サポート": "boolean"
+            },
+            "環境_言語": "string"
+        }
+    ]
+}

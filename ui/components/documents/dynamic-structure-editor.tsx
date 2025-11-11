@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Loader2, Save, Eye, Edit3, X, Sparkles, FileText, Copy, Check } from 'lucide-react';
+import { Loader2, Save, Edit3, X, Sparkles, FileText, Copy, Check } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { apiClient } from '@/lib/api-client';
@@ -53,7 +53,6 @@ export function DynamicStructureEditor({
   const [saving, setSaving] = useState(false);
   const [variables, setVariables] = useState<any>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
 
   // AI機能のstate
   const [generatingSummary, setGeneratingSummary] = useState(false);
@@ -358,10 +357,6 @@ export function DynamicStructureEditor({
                 <Edit3 className="mr-2 h-4 w-4" />
                 編集
               </Button>
-              <Button onClick={() => setPreviewDialogOpen(true)} variant="outline" size="sm">
-                <Eye className="mr-2 h-4 w-4" />
-                プレビュー
-              </Button>
               <Button onClick={handleSave} disabled={saving} size="sm">
                 {saving ? (
                   <>
@@ -622,31 +617,6 @@ export function DynamicStructureEditor({
       </Dialog>
 
       {/* プレビューモーダル */}
-      <Dialog open={previewDialogOpen} onOpenChange={setPreviewDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center justify-between">
-              <span>Excel埋め込みプレビュー</span>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setPreviewDialogOpen(false)}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </DialogTitle>
-          </DialogHeader>
-          <div className="py-4">
-            <ExcelPreviewRenderer variables={variables} data={data} />
-          </div>
-          <div className="flex justify-end gap-2 pt-4 border-t">
-            <Button variant="outline" onClick={() => setPreviewDialogOpen(false)}>
-              閉じる
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
       {/* ブラッシュアップ結果プレビューダイアログ */}
       <Dialog open={enhanceDialogOpen} onOpenChange={setEnhanceDialogOpen}>
         <DialogContent className="max-w-5xl max-h-[90vh] !p-0 flex flex-col">
@@ -716,132 +686,3 @@ export function DynamicStructureEditor({
   );
 }
 
-/**
- * Excel埋め込み形式のプレビュー表示コンポーネント
- * {{変数名}}の形式で表示し、実際のExcel埋め込みイメージを再現
- */
-function ExcelPreviewRenderer({ variables, data }: { variables: any; data: any }) {
-  const renderExcelCell = (path: string, value: any): React.ReactElement => {
-    const placeholder = `{{${path}}}`;
-    const displayValue = value !== undefined && value !== null && value !== '' ? String(value) : placeholder;
-    const isPlaceholder = displayValue === placeholder;
-
-    return (
-      <div
-        className={`
-          px-3 py-2 border border-gray-300 bg-white font-mono text-sm
-          ${isPlaceholder ? 'text-blue-600 italic' : 'text-gray-900'}
-        `}
-      >
-        {displayValue}
-      </div>
-    );
-  };
-
-  const renderSection = (schema: any, currentData: any, basePath: string = ''): React.ReactElement => {
-    // 配列の場合
-    if (Array.isArray(schema)) {
-      const arrayData = currentData || [];
-
-      return (
-        <div className="space-y-4">
-          <div className="bg-yellow-50 border-l-4 border-yellow-400 px-3 py-2 font-mono text-xs text-yellow-800">
-            {'{{#repeat:' + basePath + '}}'}
-          </div>
-
-          {arrayData.length === 0 ? (
-            <div className="text-sm text-muted-foreground italic p-4 bg-gray-50 rounded">
-              配列データがありません。実際のExcel変換時、このセクションは削除されます。
-            </div>
-          ) : (
-            arrayData.map((item: any, index: number) => (
-              <div key={index} className="border-l-2 border-blue-300 pl-4 space-y-2">
-                <p className="text-xs font-semibold text-blue-700">項目 {index + 1}</p>
-                {typeof schema[0] === 'object' && !Array.isArray(schema[0]) ? (
-                  <div className="grid grid-cols-1 gap-2">
-                    {Object.keys(schema[0]).map((key) => (
-                      <div key={key}>
-                        <label className="text-xs font-medium text-gray-600 block mb-1">
-                          {formatLabel(key)}
-                        </label>
-                        {renderExcelCell(`${basePath}.${index}.${key}`, item[key])}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  renderExcelCell(`${basePath}.${index}`, item)
-                )}
-              </div>
-            ))
-          )}
-
-          <div className="bg-yellow-50 border-l-4 border-yellow-400 px-3 py-2 font-mono text-xs text-yellow-800">
-            {'{{#end:' + basePath + '}}'}
-          </div>
-        </div>
-      );
-    }
-
-    // オブジェクトの場合
-    if (typeof schema === 'object' && schema !== null) {
-      return (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {Object.keys(schema).map((key) => {
-            const fieldPath = basePath ? `${basePath}.${key}` : key;
-            const fieldValue = currentData?.[key];
-            const fieldSchema = schema[key];
-
-            return (
-              <div key={key} className="space-y-1">
-                <label className="text-xs font-medium text-gray-600 block">
-                  {formatLabel(key)}
-                </label>
-                {Array.isArray(fieldSchema) ? (
-                  renderSection(fieldSchema, fieldValue, key)
-                ) : typeof fieldSchema === 'object' && fieldSchema !== null ? (
-                  <div className="border border-dashed border-gray-300 p-3 space-y-2 bg-gray-50">
-                    {renderSection(fieldSchema, fieldValue, fieldPath)}
-                  </div>
-                ) : (
-                  renderExcelCell(fieldPath, fieldValue)
-                )}
-              </div>
-            );
-          })}
-        </div>
-      );
-    }
-
-    // プリミティブ値
-    return renderExcelCell(basePath, currentData);
-  };
-
-  const formatLabel = (key: string): string => {
-    return key
-      .replace(/_/g, ' ')
-      .replace(/([A-Z])/g, ' $1')
-      .trim()
-      .split(' ')
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
-  };
-
-  return (
-    <div className="space-y-6">
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <h4 className="text-sm font-semibold text-blue-900 mb-2">
-          Excel埋め込みプレビュー
-        </h4>
-        <p className="text-xs text-blue-700">
-          青いイタリック体: <code className="bg-blue-100 px-1 rounded">{'{{'}</code>変数名<code className="bg-blue-100 px-1 rounded">{'}}'}</code> は未入力のプレースホルダー<br />
-          黒文字: 入力済みのデータ<br />
-          黄色のマーカー: 繰り返しセクション（<code className="bg-blue-100 px-1 rounded">{'{#repeat:...}'}</code>）
-        </p>
-      </div>
-
-      <div className="border-2 border-gray-400 shadow-lg bg-gray-100 p-6">
-        {renderSection(variables, data)}
-      </div>
-    </div>
-  );
-}

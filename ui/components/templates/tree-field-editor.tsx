@@ -14,12 +14,14 @@ interface TreeFieldEditorProps {
 }
 
 type FieldType = 'string' | 'object' | 'array';
+type ValueType = 'string' | 'date' | 'datetime' | 'number' | 'boolean';
 
 interface AddFieldDialogState {
   isOpen: boolean;
   parentPath: string[];
   fieldName: string;
   fieldType: FieldType;
+  valueType: ValueType;
 }
 
 export function TreeFieldEditor({ data, onChange }: TreeFieldEditorProps) {
@@ -29,6 +31,7 @@ export function TreeFieldEditor({ data, onChange }: TreeFieldEditorProps) {
     parentPath: [],
     fieldName: '',
     fieldType: 'string',
+    valueType: 'string',
   });
   const [editingField, setEditingField] = useState<{ path: string[]; oldName: string } | null>(null);
   const [newFieldName, setNewFieldName] = useState('');
@@ -51,8 +54,20 @@ export function TreeFieldEditor({ data, onChange }: TreeFieldEditorProps) {
   // フィールドタイプを判定
   const getFieldType = (value: any): FieldType => {
     if (Array.isArray(value)) return 'array';
-    if (typeof value === 'object' && value !== null) return 'object';
+    if (typeof value === 'object' && value !== null) {
+      // 型定義オブジェクト { type: "string" } の場合は string として扱う
+      if ('type' in value && typeof value.type === 'string') return 'string';
+      return 'object';
+    }
     return 'string';
+  };
+
+  // 値の型を取得（新形式の場合）
+  const getValueType = (value: any): ValueType | null => {
+    if (typeof value === 'object' && value !== null && 'type' in value) {
+      return value.type as ValueType;
+    }
+    return null;
   };
 
   // アイコンを取得
@@ -110,7 +125,7 @@ export function TreeFieldEditor({ data, onChange }: TreeFieldEditorProps) {
 
   // フィールド追加
   const handleAddField = () => {
-    const { parentPath, fieldName, fieldType } = addDialog;
+    const { parentPath, fieldName, fieldType, valueType } = addDialog;
 
     if (!fieldName.trim()) {
       toast.error('フィールド名を入力してください');
@@ -139,7 +154,8 @@ export function TreeFieldEditor({ data, onChange }: TreeFieldEditorProps) {
     let initialValue: any;
     switch (fieldType) {
       case 'string':
-        initialValue = '';
+        // 型情報をオブジェクトとして保存
+        initialValue = { type: valueType };
         break;
       case 'object':
         initialValue = {};
@@ -162,6 +178,7 @@ export function TreeFieldEditor({ data, onChange }: TreeFieldEditorProps) {
       parentPath: [],
       fieldName: '',
       fieldType: 'string',
+      valueType: 'string',
     });
 
     toast.success(`フィールド「${fieldName}」を追加しました`);
@@ -267,6 +284,11 @@ export function TreeFieldEditor({ data, onChange }: TreeFieldEditorProps) {
           <span className="text-xs text-muted-foreground">
             {fieldType === 'array' && `[${value.length}]`}
             {fieldType === 'object' && `{${Object.keys(value).length}}`}
+            {fieldType === 'string' && getValueType(value) && (
+              <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-700 rounded">
+                {getValueType(value)}
+              </span>
+            )}
           </span>
 
           {/* 操作ボタン */}
@@ -282,6 +304,7 @@ export function TreeFieldEditor({ data, onChange }: TreeFieldEditorProps) {
                     parentPath: fullPath,
                     fieldName: '',
                     fieldType: 'string',
+                    valueType: 'string',
                   })
                 }
                 className="h-6 w-6 p-0"
@@ -366,6 +389,7 @@ export function TreeFieldEditor({ data, onChange }: TreeFieldEditorProps) {
               parentPath: [],
               fieldName: '',
               fieldType: 'string',
+              valueType: 'string',
             })
           }
           className="gap-2"
@@ -426,6 +450,29 @@ export function TreeFieldEditor({ data, onChange }: TreeFieldEditorProps) {
               </Select>
             </div>
 
+            {/* 値の型選択（string型の場合のみ表示） */}
+            {addDialog.fieldType === 'string' && (
+              <div className="space-y-2">
+                <Label htmlFor="valueType">値の型</Label>
+                <Select
+                  id="valueType"
+                  value={addDialog.valueType}
+                  onChange={(e) =>
+                    setAddDialog((prev) => ({
+                      ...prev,
+                      valueType: e.target.value as ValueType,
+                    }))
+                  }
+                >
+                  <option value="string">文字列</option>
+                  <option value="date">日付 (例: 2025年1月15日)</option>
+                  <option value="datetime">日時 (例: 2025年1月15日10時23分)</option>
+                  <option value="number">数値</option>
+                  <option value="boolean">真偽値 (〇/空欄)</option>
+                </Select>
+              </div>
+            )}
+
             <div className="flex justify-end gap-2 pt-2">
               <Button
                 type="button"
@@ -436,6 +483,7 @@ export function TreeFieldEditor({ data, onChange }: TreeFieldEditorProps) {
                     parentPath: [],
                     fieldName: '',
                     fieldType: 'string',
+                    valueType: 'string',
                   })
                 }
               >
