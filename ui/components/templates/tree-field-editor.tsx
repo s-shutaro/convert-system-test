@@ -54,18 +54,17 @@ export function TreeFieldEditor({ data, onChange }: TreeFieldEditorProps) {
   // フィールドタイプを判定
   const getFieldType = (value: any): FieldType => {
     if (Array.isArray(value)) return 'array';
-    if (typeof value === 'object' && value !== null) {
-      // 型定義オブジェクト { type: "string" } の場合は string として扱う
-      if ('type' in value && typeof value.type === 'string') return 'string';
-      return 'object';
-    }
+    if (typeof value === 'object' && value !== null) return 'object';
+    // string型の値（"string", "date", "number"など）
     return 'string';
   };
 
-  // 値の型を取得（新形式の場合）
+  // 値の型を取得
   const getValueType = (value: any): ValueType | null => {
-    if (typeof value === 'object' && value !== null && 'type' in value) {
-      return value.type as ValueType;
+    // 値が文字列で、ValueTypeのいずれかに該当する場合
+    if (typeof value === 'string' &&
+        ['string', 'date', 'datetime', 'number', 'boolean'].includes(value)) {
+      return value as ValueType;
     }
     return null;
   };
@@ -154,8 +153,8 @@ export function TreeFieldEditor({ data, onChange }: TreeFieldEditorProps) {
     let initialValue: any;
     switch (fieldType) {
       case 'string':
-        // 型情報をオブジェクトとして保存
-        initialValue = { type: valueType };
+        // 型名を直接文字列として保存（template_jp_type.json形式）
+        initialValue = valueType;
         break;
       case 'object':
         initialValue = {};
