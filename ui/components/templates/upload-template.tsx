@@ -17,11 +17,11 @@ import {
 import { apiClient } from '@/lib/api-client';
 import { useAppStore } from '@/lib/store';
 import { toast } from 'sonner';
+import { VariableDefinitionModal } from './variable-definition-modal';
 
 interface TemplateFormData {
   name: string;
   description: string;
-  variables: string;
 }
 
 interface UploadTemplateProps {
@@ -33,6 +33,10 @@ export function UploadTemplate({ onSuccess }: UploadTemplateProps) {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const addTemplate = useAppStore((state) => state.addTemplate);
+
+  // テンプレート変数の状態管理
+  const [templateVariables, setTemplateVariables] = useState<any>({});
+  const [showVariableModal, setShowVariableModal] = useState(false);
 
   const {
     register,
@@ -62,17 +66,10 @@ export function UploadTemplate({ onSuccess }: UploadTemplateProps) {
 
     setUploading(true);
     try {
+      // テンプレート変数をJSON化（フォームビルダーで構築したデータ）
       let variables: any = null;
-
-      // Parse variables if provided
-      if (data.variables.trim()) {
-        try {
-          variables = JSON.parse(data.variables);
-        } catch (e) {
-          toast.error('変数定義のJSONが不正です');
-          setUploading(false);
-          return;
-        }
+      if (Object.keys(templateVariables).length > 0) {
+        variables = templateVariables;
       }
 
       const response = await apiClient.uploadTemplate(
@@ -91,6 +88,7 @@ export function UploadTemplate({ onSuccess }: UploadTemplateProps) {
       // Reset form
       reset();
       setFile(null);
+      setTemplateVariables({});
       setOpen(false);
 
       if (onSuccess) onSuccess();
@@ -178,27 +176,37 @@ export function UploadTemplate({ onSuccess }: UploadTemplateProps) {
               />
             </div>
 
-            {/* Variables */}
-            <div className="space-y-2">
-              <Label htmlFor="variables">変数定義（JSON形式、任意）</Label>
-              <Textarea
-                id="variables"
-                {...register('variables')}
-                placeholder={`例:
-{
-  "basic_info": {
-    "name": "",
-    "age": ""
-  },
-  "work_experience": [],
-  "skills": []
-}`}
-                rows={6}
-                className="font-mono text-sm"
-              />
-              <p className="text-xs text-muted-foreground">
-                テンプレート内で使用する変数の構造をJSON形式で定義します
-              </p>
+            {/* Variables - Modal Launcher */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label>変数定義（任意）</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowVariableModal(true)}
+                  className="gap-2"
+                >
+                  {Object.keys(templateVariables).length > 0 ? '変数を編集' : '変数を定義'}
+                </Button>
+              </div>
+
+              {Object.keys(templateVariables).length > 0 ? (
+                <div className="border rounded-lg p-4 bg-muted/20">
+                  <p className="text-sm text-muted-foreground">
+                    {Object.keys(templateVariables).length} 個のフィールドが定義されています
+                  </p>
+                  <pre className="mt-2 text-xs font-mono bg-white p-3 rounded border overflow-auto max-h-32">
+                    {JSON.stringify(templateVariables, null, 2)}
+                  </pre>
+                </div>
+              ) : (
+                <div className="border rounded-lg p-4 bg-muted/20">
+                  <p className="text-sm text-muted-foreground text-center">
+                    テンプレート内で使用する変数を定義します
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Actions */}
@@ -218,6 +226,16 @@ export function UploadTemplate({ onSuccess }: UploadTemplateProps) {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Variable Definition Modal */}
+      <VariableDefinitionModal
+        open={showVariableModal}
+        onOpenChange={setShowVariableModal}
+        initialData={templateVariables}
+        onConfirm={(data) => {
+          setTemplateVariables(data);
+        }}
+      />
     </>
   );
 }
