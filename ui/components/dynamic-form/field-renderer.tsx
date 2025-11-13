@@ -63,8 +63,11 @@ export function FieldRenderer({
     // スキーマ値が長い場合（後方互換性のため残す）
     const hasLongSchema = typeof fieldSchema === 'string' && fieldSchema.length > 50;
 
+    // 改行を含む場合
+    const hasNewline = typeof value === 'string' && value.includes('\n');
+
     // いずれかの条件を満たす場合は複数行テキストエリアを使用
-    const isLongText = hasLongValue || hasLongSchema;
+    const isLongText = hasLongValue || hasLongSchema || hasNewline;
 
     const isEnhancing = enhancingField === fieldPath;
     const hasValue = value && typeof value === 'string' && value.trim().length > 0;
