@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Sparkles, Loader2, ChevronDown } from 'lucide-react';
 
 interface FieldRendererProps {
@@ -37,6 +37,8 @@ export function FieldRenderer({
   enhancingField,
   allData,
 }: FieldRendererProps) {
+  // 元の文章を表示するための状態管理（Hooksはトップレベルで呼び出す必要がある）
+  const [showOriginal, setShowOriginal] = useState(false);
 
   // フィールド名をラベル用にフォーマット
   const formatLabel = (key: string): string => {
@@ -67,9 +69,6 @@ export function FieldRenderer({
     // 表示する値: improvedが存在する場合はそれを優先
     const displayValue = hasImprovedVersion ? improvedValue : value;
     const originalValue = value;
-
-    // 元の文章を表示するための状態管理
-    const [showOriginal, setShowOriginal] = useState(false);
 
     // 複数行テキストエリアが必要かどうかを判定
     // 実際の値が長い場合（100文字以上）
