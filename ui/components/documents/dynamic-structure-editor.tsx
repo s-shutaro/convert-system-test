@@ -573,6 +573,7 @@ export function DynamicStructureEditor({
                             level={0}
                             onEnhance={handleEnhanceField}
                             enhancingField={enhancingField}
+                            allData={data}
                           />
                         )}
                       </div>

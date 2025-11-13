@@ -1,11 +1,12 @@
 'use client';
 
+import { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Sparkles, Loader2 } from 'lucide-react';
+import { Sparkles, Loader2, ChevronDown } from 'lucide-react';
 
 interface FieldRendererProps {
   fieldPath: string;
@@ -15,6 +16,7 @@ interface FieldRendererProps {
   level?: number;
   onEnhance?: (fieldPath: string) => void;
   enhancingField?: string | null;
+  allData?: any; // _improvedフィールドの存在確認用
 }
 
 /**
@@ -33,6 +35,7 @@ export function FieldRenderer({
   level = 0,
   onEnhance,
   enhancingField,
+  allData,
 }: FieldRendererProps) {
 
   // フィールド名をラベル用にフォーマット
@@ -56,21 +59,33 @@ export function FieldRenderer({
     typeof fieldSchema === 'number' ||
     typeof fieldSchema === 'boolean'
   ) {
+    // _improvedフィールドの存在確認
+    const improvedFieldPath = `${fieldPath}_improved`;
+    const improvedValue = allData?.[improvedFieldPath];
+    const hasImprovedVersion = improvedValue !== undefined && improvedValue !== null && improvedValue !== '';
+
+    // 表示する値: improvedが存在する場合はそれを優先
+    const displayValue = hasImprovedVersion ? improvedValue : value;
+    const originalValue = value;
+
+    // 元の文章を表示するための状態管理
+    const [showOriginal, setShowOriginal] = useState(false);
+
     // 複数行テキストエリアが必要かどうかを判定
     // 実際の値が長い場合（100文字以上）
-    const hasLongValue = typeof value === 'string' && value.length > 100;
+    const hasLongValue = typeof displayValue === 'string' && displayValue.length > 100;
 
     // スキーマ値が長い場合（後方互換性のため残す）
     const hasLongSchema = typeof fieldSchema === 'string' && fieldSchema.length > 50;
 
     // 改行を含む場合
-    const hasNewline = typeof value === 'string' && value.includes('\n');
+    const hasNewline = typeof displayValue === 'string' && displayValue.includes('\n');
 
     // いずれかの条件を満たす場合は複数行テキストエリアを使用
     const isLongText = hasLongValue || hasLongSchema || hasNewline;
 
     const isEnhancing = enhancingField === fieldPath;
-    const hasValue = value && typeof value === 'string' && value.trim().length > 0;
+    const hasValue = displayValue && typeof displayValue === 'string' && displayValue.trim().length > 0;
     const canEnhance = onEnhance && hasValue;
 
     return (
@@ -79,7 +94,7 @@ export function FieldRenderer({
           <div className="flex-1">
             {isLongText ? (
               <Textarea
-                value={value || ''}
+                value={displayValue || ''}
                 onChange={(e) => onChange(fieldPath, e.target.value)}
                 placeholder="入力してください"
                 rows={4}
@@ -87,7 +102,7 @@ export function FieldRenderer({
               />
             ) : (
               <Input
-                value={value || ''}
+                value={displayValue || ''}
                 onChange={(e) => onChange(fieldPath, e.target.value)}
                 placeholder="入力してください"
               />
@@ -115,6 +130,28 @@ export function FieldRenderer({
             </Button>
           )}
         </div>
+
+        {/* 改善版が存在する場合、元の文章を表示 */}
+        {hasImprovedVersion && originalValue && (
+          <div className="mt-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowOriginal(!showOriginal)}
+              className="text-xs text-muted-foreground h-6 px-2"
+            >
+              <ChevronDown className={`h-3 w-3 mr-1 transition-transform ${showOriginal ? 'rotate-180' : ''}`} />
+              {showOriginal ? '元の文章を隠す' : '元の文章を表示'}
+            </Button>
+            {showOriginal && (
+              <div className="mt-2 p-3 bg-muted/50 rounded-md border border-muted">
+                <p className="text-xs text-muted-foreground mb-1">元の文章:</p>
+                <p className="text-sm whitespace-pre-wrap">{originalValue}</p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     );
   }
@@ -171,6 +208,7 @@ export function FieldRenderer({
                 level={level + 1}
                 onEnhance={onEnhance}
                 enhancingField={enhancingField}
+                allData={allData}
               />
             </div>
           );
