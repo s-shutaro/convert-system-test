@@ -26,7 +26,7 @@
                 "概要": "string"
             },
             "役割_役職": "string",
-            "人数_規模": "string",
+            "人数_規模": "number",
             "担当工程": {
                 "コンサル": "boolean",
                 "要件定義": "boolean",

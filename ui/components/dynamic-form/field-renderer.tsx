@@ -57,21 +57,6 @@ export function FieldRenderer({
     typeof fieldSchema === 'boolean'
   ) {
     // 複数行テキストエリアが必要かどうかを判定
-    const multilineKeywords = [
-      // 英語キーワード
-      'overview', 'description', 'summary', 'detail', 'content',
-      'comment', 'note', 'text', 'body', 'message', 'remarks',
-      // 日本語キーワード
-      '概要', '説明', '詳細', '内容', '備考', 'コメント', 'テキスト',
-      '本文', 'メッセージ', '記述', '記載'
-    ];
-
-    // フィールド名に複数行が必要なキーワードが含まれているか
-    const fieldNameLower = fieldPath.toLowerCase();
-    const hasMultilineKeyword = multilineKeywords.some(keyword =>
-      fieldNameLower.includes(keyword.toLowerCase())
-    );
-
     // 実際の値が長い場合（100文字以上）
     const hasLongValue = typeof value === 'string' && value.length > 100;
 
@@ -79,7 +64,7 @@ export function FieldRenderer({
     const hasLongSchema = typeof fieldSchema === 'string' && fieldSchema.length > 50;
 
     // いずれかの条件を満たす場合は複数行テキストエリアを使用
-    const isLongText = hasMultilineKeyword || hasLongValue || hasLongSchema;
+    const isLongText = hasLongValue || hasLongSchema;
 
     const isEnhancing = enhancingField === fieldPath;
     const hasValue = value && typeof value === 'string' && value.trim().length > 0;
